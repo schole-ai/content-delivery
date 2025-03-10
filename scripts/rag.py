@@ -1,4 +1,5 @@
 import os
+import spacy
 from langchain_community.vectorstores import Neo4jVector
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_neo4j import Neo4jGraph
@@ -10,7 +11,8 @@ class KnowledgeGraphRAG:
         self.url = url
         self.username = username
         self.password = password
-        self.vector_store = self.get_vector_store()
+        # self.vector_store = self.get_vector_store()
+        self.nlp = spacy.load("en_core_web_sm")
         
     
     def get_vector_store(self) -> Neo4jVector:
@@ -32,5 +34,26 @@ class KnowledgeGraphRAG:
         print("Vector store created!")
         return vector_store
     
+    def extract_topics(self, query: str) -> list:
+        """
+        Extract topics from a query using spaCy
+
+        :param query: The query to extract topics from
+
+        :return: A list of topics extracted from the query
+        """
+
+        doc = self.nlp(query)
+        topics = [chunk.text for chunk in doc.noun_chunks if not chunk.root.is_stop and chunk.root.pos_ != 'PRON']
+        return topics
+    
     def search_query(self, query: str, k=5):
-        return self.vector_store.similartiy_search(query, k)
+        topics = self.extract_topics(query)
+        res = {}
+
+        for topic in topics:
+            print(f"Searching content for topic: {topic}")
+            self.vector_store.similartiy_search(topic, k)
+            res[topic] = self.vector_store.similartiy_search(topic, k)
+
+        return res

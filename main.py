@@ -8,7 +8,8 @@ from utils.login import *
 
 def main(args, query):
     kgrag = KnowledgeGraphRAG(args.url, args.username, args.password)
-    results = kgrag.search_query(query)
+    # results = kgrag.search_query(query)
+    results = kgrag.extract_topics(query)
     print(results)
     
 
