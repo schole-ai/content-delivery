@@ -3,14 +3,16 @@ import argparse
 
 from scripts.rag import KnowledgeGraphRAG
 
-from utils.login import *
+from utils.helpers import *
 
 
 def main(args, query):
     kgrag = KnowledgeGraphRAG(args.url, args.username, args.password)
-    # results = kgrag.search_query(query)
-    results = kgrag.extract_topics(query)
-    print(results)
+    results = kgrag.search_query(query)
+    # results = kgrag.extract_topics(query)
+    for key, value in results.items():
+        print(f"{key}: {value['name'], value['content']}")
+    # print(results)
     
 
 if __name__ == "__main__":
