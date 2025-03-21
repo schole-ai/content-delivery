@@ -1,18 +1,21 @@
 import os
 import argparse
 
-from scripts.rag import KnowledgeGraphRAG
+from scripts.neo4j_rag import KnowledgeGraphRAG
+from scripts.rag import ANNRetriever
 
 from utils.helpers import *
 
 
 def main(args, query):
-    kgrag = KnowledgeGraphRAG(args.url, args.username, args.password)
-    results = kgrag.search_query(query)
-    # results = kgrag.extract_topics(query)
-    for key, value in results.items():
-        print(f"{key}: {value['name'], value['content']}")
-    # print(results)
+    # kgrag = KnowledgeGraphRAG(args.url, args.username, args.password)
+    # results = kgrag.search_query(query)
+    # for key, value in results.items():
+    #     print(f"{key}: {value['name'], value['content']}")
+
+    retriever = ANNRetriever(args.url, args.username, args.password, node_id=1769)
+    top_k = retriever.retrieve_top_k(query, k=1)
+    print(f"Top k: {top_k}")
     
 
 if __name__ == "__main__":

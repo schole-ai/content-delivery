@@ -1,115 +1,101 @@
 import os
-import spacy
-import pickle
-from langchain_community.vectorstores import Neo4jVector
+import sys
+import numpy as np
+import logging
+
+logging.basicConfig(level=logging.ERROR)
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
+
+from abc import ABC, abstractmethod
+from sklearn.metrics.pairwise import cosine_similarity
+from utils.helpers import connection
 from langchain_openai import OpenAIEmbeddings
-from langchain_neo4j import Neo4jGraph
 from dotenv import load_dotenv
 
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+EMBEDDING_LEN = 1536
 
-class KnowledgeGraphRAG:
-    def __init__(self, url, username, password, vector_store_path="data/vector_store.pkl"):
+class Retriever(ABC):
+    def __init__(self, url, username, password, node_id, doc_property="documents", doc_embeddings_property="doc_embeddings"):
         self.url = url
         self.username = username
         self.password = password
-        self.vector_store_path = vector_store_path
+        self.node_id = node_id
+        self.doc_property = doc_property
+        self.doc_embeddings_property = doc_embeddings_property
         self.embedding_model = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
-        self.vector_store = self.get_vector_store()
-        self.nlp = spacy.load("en_core_web_sm")
-        
-    
-    def get_vector_store(self, save=True) -> Neo4jVector:
-        """Get or create a vector store for the knowledge graph."""
+        self.driver = connection(url, username, password)
+        self.docs = self.get_documents()
+        self.embeddings = self.get_embeddings()
 
-        print("Creating vector store...")
+    @abstractmethod
+    def retrieve_top_k(self, query, k=5):
+        pass
 
-        vector_store = self.load_vector_store()
-        if vector_store:
-            return vector_store
-
-        vector_store = Neo4jVector.from_existing_graph(
-            embedding=self.embedding_model,
-            url = self.url,
-            username = self.username,
-            password = self.password,
-            index_name = "topic_index",
-            node_label = "Topic",
-            text_node_properties = ["name", "content"],
-            embedding_node_property = "embedding",
-        )
-        
-        self.vector_store = vector_store
-        if save:
-            self.save_vector_store()
-
-        print("Vector store created!")
-        return vector_store
-    
-    def save_vector_store(self):
-        """Save vector store metadata to a file."""
-
-        if self.vector_store:
-            data_to_save = {
-                "index_name": "topic_index",
-                "node_label": "Topic",
-                "text_node_properties": ["name", "content"],
-                "embedding_node_property": "embedding",
-            }
-            with open(self.vector_store_path, "wb") as f:
-                pickle.dump(data_to_save, f)
-            print("Vector store metadata saved!")
-
-    def load_vector_store(self):
-        """Load vector store metadata and reconstruct the object."""
-
-        try:
-            with open(self.vector_store_path, "rb") as f:
-                data = pickle.load(f)
-                print("Loaded vector store metadata from file!")
-
-                return Neo4jVector.from_existing_graph(
-                    embedding=self.embedding_model,
-                    url=self.url,
-                    username=self.username,
-                    password=self.password,
-                    **data  
-                )
-        except (FileNotFoundError, EOFError, pickle.UnpicklingError):
-            print("No valid vector store found. Creating a new one...")
-            return None
-    
-    def extract_topics(self, query: str) -> list:
+    def get_documents(self):
         """
-        Extract topics from a query using spaCy
+        Get documents from a node in the knowledge graph.
 
-        :param query: The query to extract topics from
-
-        :return: A list of topics extracted from the query
+        Returns:
+            list: List of documents
         """
 
-        doc = self.nlp(query)
-        topics = [chunk.text for chunk in doc.noun_chunks if not chunk.root.is_stop and chunk.root.pos_ != 'PRON']
-        return topics
+        query = f"MATCH (n) WHERE id(n) = {self.node_id} RETURN n.{self.doc_property} AS documents"
+
+        with self.driver.session() as session:
+            result = session.run(query).single()
+            documents = result["documents"]
+        
+        return documents
+        
+    def get_embeddings(self):
+        """
+        Get embeddings for the documents.
+
+        Returns:
+            np.array: embeddings for the documents of shape (nb_docs, EMBEDDING_LEN)
+        """
+
+        query = f"MATCH (n) WHERE id(n) = {self.node_id} RETURN n.{self.doc_embeddings_property} AS doc_embeddings"
+
+        with self.driver.session() as session:
+            result = session.run(query).single()
+            embeddings = result["doc_embeddings"]
+            # Reshape embeddings from list[nb_doc * EMBEDDING_LEN] to np.array[nb_doc, EMBEDDING_LEN]
+            embeddings = np.array(embeddings).reshape(-1, EMBEDDING_LEN)
+        
+
+        return embeddings
     
-    def search_query(self, query: str) -> dict:
-        topics = self.extract_topics(query)
-        res = {}
+    
+class ANNRetriever(Retriever):
+    def __init__(self, url, username, password, node_id, doc_property="documents", doc_embeddings_property="doc_embeddings"):
+        super().__init__(url, username, password, node_id, doc_property, doc_embeddings_property)
+    
+    def retrieve_top_k(self, query, k=1):
+        """
+        Retrieve the top k documents based on cosine similarity.
 
-        for topic in topics:
-            print(f"Searching content for topic: {topic}")
-            
-            search_result = self.vector_store.similarity_search(topic)
+        Args:
+            query (str): The query to search for.
+            k (int): The number of documents to retrieve.
 
-            if search_result: 
-                text = search_result[0].page_content 
-                node_name = text.split("content:")[0].replace("name:", "").strip()
-                node_content = text.split("content:")[1].strip() if "content:" in text else ""
-                res[topic] = {"name": node_name, "content": node_content}
-            else:
-                res[topic] = {"name": None, "content": None} 
+        Returns:
+            list: The top k documents.
+        """
 
-
-        return res
+        query_embedding = self.embedding_model.embed_query(query)
+        query_embedding = np.array(query_embedding).reshape(1, -1)
+        
+        # Calculate cosine similarity
+        similarities = cosine_similarity(query_embedding, self.embeddings)
+        
+        # Get top k indices
+        top_k_indices = similarities[0].argsort()[-k:][::-1]
+        
+        # Get top k documents
+        top_k_docs = [self.docs[i] for i in top_k_indices]
+        
+        return top_k_indices, top_k_docs

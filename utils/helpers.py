@@ -1,7 +1,7 @@
-from langchain_neo4j import Neo4jGraph
+from neo4j import GraphDatabase
 from IPython.display import display, HTML
 
-def connection(url="bolt://localhost:7687", username="neo4j", password="password123") -> Neo4jGraph:
+def connection(url="bolt://localhost:7687", username="neo4j", password="password123") -> GraphDatabase:
     """
     Connect to a Neo4j database
 
@@ -9,15 +9,15 @@ def connection(url="bolt://localhost:7687", username="neo4j", password="password
     :param username: Username of the Neo4j database
     :param password: Password of the Neo4j database
     
-    :return: A connection to the Neo4j database
+    :return: A Neo4j driver instance
     """
     try:
-        graph = Neo4jGraph(url, username, password)
+        driver = GraphDatabase.driver(url, auth=(username, password))
         print("Connected to Neo4j!")
     except Exception as e:
         print(f"Error connecting to Neo4j: {e}")
         return None
-    return graph
+    return driver
 
 
 def display_chunks(chunks, num_chunks=None):
