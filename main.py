@@ -2,7 +2,7 @@ import os
 import argparse
 
 from scripts.neo4j_rag import KnowledgeGraphRAG
-from scripts.rag import ANNRetriever
+from scripts.rag import CosineRetriever, FaissRetriever
 
 from utils.helpers import *
 
@@ -13,7 +13,8 @@ def main(args, query):
     # for key, value in results.items():
     #     print(f"{key}: {value['name'], value['content']}")
 
-    retriever = ANNRetriever(args.url, args.username, args.password, node_id=1769)
+    # retriever = CosineRetriever(args.url, args.username, args.password, node_id=1769)
+    retriever = FaissRetriever(args.url, args.username, args.password, node_id=1769)
     top_k = retriever.retrieve_top_k(query, k=1)
     print(f"Top k: {top_k}")
     

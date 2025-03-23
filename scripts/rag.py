@@ -1,6 +1,7 @@
 import os
 import sys
 import numpy as np
+import faiss
 import logging
 
 logging.basicConfig(level=logging.ERROR)
@@ -70,7 +71,7 @@ class Retriever(ABC):
         return embeddings
     
     
-class ANNRetriever(Retriever):
+class CosineRetriever(Retriever):
     def __init__(self, url, username, password, node_id, doc_property="documents", doc_embeddings_property="doc_embeddings"):
         super().__init__(url, username, password, node_id, doc_property, doc_embeddings_property)
     
@@ -99,3 +100,33 @@ class ANNRetriever(Retriever):
         top_k_docs = [self.docs[i] for i in top_k_indices]
         
         return top_k_indices, top_k_docs
+    
+
+class FaissRetriever(Retriever):
+    def __init__(self, url, username, password, node_id, doc_property="documents", doc_embeddings_property="doc_embeddings"):
+        super().__init__(url, username, password, node_id, doc_property, doc_embeddings_property)
+        self.index = faiss.IndexFlatIP(self.embeddings.shape[1])
+        self.index.add(self.embeddings)
+    
+    def retrieve_top_k(self, query, k=1):
+        """
+        Retrieve the top k documents based on cosine similarity using Faiss.
+
+        Args:
+            query (str): The query to search for.
+            k (int): The number of documents to retrieve.
+
+        Returns:
+            list: The top k documents.
+        """
+
+        query_embedding = self.embedding_model.embed_query(query)
+        query_embedding = np.array(query_embedding).reshape(1, -1)
+        
+        # Search index
+        _, top_k_indices = self.index.search(query_embedding, k)
+        
+        # Get top k documents
+        top_k_docs = [self.docs[i] for i in top_k_indices[0]]
+        
+        return top_k_indices[0], top_k_docs
