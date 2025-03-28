@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import faiss
+import time
 import logging
 
 logging.basicConfig(level=logging.ERROR)
@@ -87,6 +88,8 @@ class CosineRetriever(Retriever):
             list: The top k documents.
         """
 
+        start_time = time.time()
+
         query_embedding = self.embedding_model.embed_query(query)
         query_embedding = np.array(query_embedding).reshape(1, -1)
         
@@ -98,6 +101,10 @@ class CosineRetriever(Retriever):
         
         # Get top k documents
         top_k_docs = [self.docs[i] for i in top_k_indices]
+
+        end_time = time.time()
+
+        print(f"Retrieval time: {end_time - start_time:.2f} seconds")
         
         return top_k_indices, top_k_docs
     
@@ -120,6 +127,8 @@ class FaissRetriever(Retriever):
             list: The top k documents.
         """
 
+        start_time = time.time()
+
         query_embedding = self.embedding_model.embed_query(query)
         query_embedding = np.array(query_embedding).reshape(1, -1)
         
@@ -128,5 +137,9 @@ class FaissRetriever(Retriever):
         
         # Get top k documents
         top_k_docs = [self.docs[i] for i in top_k_indices[0]]
+
+        end_time = time.time()
+
+        print(f"Retrieval time: {end_time - start_time:.2f} seconds")
         
         return top_k_indices[0], top_k_docs

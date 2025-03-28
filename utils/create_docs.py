@@ -40,6 +40,13 @@ def get_content(url="bolt://localhost:7687", username="neo4j", password="passwor
 
 
 def create_docs():
+    """
+    Create synthetic documents by chunking the content into smaller parts.
+
+    Returns:
+        list: List of dictionaries containing the node ID, content, name and chunks.
+    """
+
     tc = TextChunker()
     docs = get_content()
     for doc in docs:
@@ -48,6 +55,15 @@ def create_docs():
     return docs
 
 def save_to_file(docs, folder="data", filename="docs.json"):
+    """
+    Save the synthetic documents to a JSON file.
+    
+    Args:
+        docs: list, List of dictionaries containing the node ID, content, name and chunks.
+        folder: str, Folder to save the JSON file.
+        filename: str, Name of the JSON file.
+    """
+
     filepath = os.path.join(folder, filename)
 
     if not os.path.exists(folder):
@@ -60,6 +76,15 @@ def save_to_file(docs, folder="data", filename="docs.json"):
 
 
 def update_nodes(filepath="data/docs.json", url="bolt://localhost:7687", username="neo4j", password="password123"):
+    """
+    Update the Neo4j graph with the document chunks.
+    
+    Args:
+        filepath: str, Path to the JSON file containing the synthetic documents.
+        url: str, URL of the Neo4j database.
+        username: str, Username for the Neo4j database.
+        password: str, Password for the Neo4j database.
+    """
 
     driver = connection(url, username, password)
 
