@@ -1,9 +1,10 @@
 import os
-from openai import OpenAI
+import requests
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
+from openai import OpenAI
 from utils.prompts import create_prompt
 from dotenv import load_dotenv
 
@@ -12,6 +13,11 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 BLOOM_TAXONOMY = {1: "Remember", 2: "Understand", 3: "Apply", 4: "Analyze", 5: "Evaluate", 6: "Create"}
+BLOOM_BERT_MAP = {"Remember": 1, "Understand": 2, "Apply": 3, "Analyse": 4, "Evaluate": 5, "Create": 6}
+
+# URL for BloomBERT API (https://github.com/RyanLauQF/BloomBERT?tab=readme-ov-file)
+BLOOM_BERT_URL = "https://bloom-bert-api-dmkyqqzsta-as.a.run.app/predict"
+
 
 class BloomQuestionGenerator:
     def __init__(self, model="gpt-4"):
@@ -66,9 +72,25 @@ class BloomQuestionGenerator:
 
         assert level in range(1, 7), "Invalid Bloom's Taxonomy level. Level should be between 1 and 6."
 
-        # TODO: Implement BloomBERT evaluation
+        question_data = {"text": question}
 
-        pass
+        try:
+
+            response = requests.post(BLOOM_BERT_URL, json=question_data)
+
+            response.raise_for_status()
+
+            response_dict = response.json()
+            # print(response_dict)
+
+            predicted_level = BLOOM_BERT_MAP.get(response_dict.get("blooms_level"))
+
+            return predicted_level, predicted_level == level
+
+        except Exception as e:
+            print(f"Error: {e}")
+            return False
+
 
     def check_answer(self, question, answer):
         """

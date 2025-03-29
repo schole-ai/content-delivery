@@ -112,7 +112,7 @@ class CosineRetriever(Retriever):
 class FaissRetriever(Retriever):
     def __init__(self, url, username, password, node_id, doc_property="documents", doc_embeddings_property="doc_embeddings"):
         super().__init__(url, username, password, node_id, doc_property, doc_embeddings_property)
-        self.index = faiss.IndexFlatIP(self.embeddings.shape[1])
+        self.index = faiss.IndexFlatL2(self.embeddings.shape[1])
         self.index.add(self.embeddings)
     
     def retrieve_top_k(self, query, k=1):

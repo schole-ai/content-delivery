@@ -176,3 +176,6 @@ cython_debug/
 # Additional folders
 papers
 data
+
+# CSV files
+*.csv
