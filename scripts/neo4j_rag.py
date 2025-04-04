@@ -86,7 +86,7 @@ class KnowledgeGraphRAG:
         Extract topics from a query using spaCy
 
         Args:
-            query: str, the query to extract topics from
+            query (str): the query to extract topics from
 
         Returns:
             list: A list of topics extracted from the query
@@ -101,7 +101,7 @@ class KnowledgeGraphRAG:
         Search the knowledge graph for content related to a query.
 
         Args:
-            query: str
+            query (str): The query to search for
 
         Returns:
             dict: A dictionary containing the topics and the content related to the query

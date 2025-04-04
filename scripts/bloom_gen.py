@@ -1,11 +1,12 @@
 import os
+import json
 import requests
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
 from openai import OpenAI
-from utils.prompts import create_prompt
+from utils.prompts import create_prompt, create_refine_prompt, create_judge_prompt
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,12 +21,13 @@ BLOOM_BERT_URL = "https://bloom-bert-api-dmkyqqzsta-as.a.run.app/predict"
 
 
 class BloomQuestionGenerator:
+    """Class to generate questions based on Bloom's Taxonomy"""
     def __init__(self, model="gpt-4"):
         self.model = model
         self.client = OpenAI(api_key=OPENAI_API_KEY)
     
 
-    def generate_question(self, text, question_type="MCQ", level=1, prompt_type="basic"):
+    def generate_question(self, text, question_type="MCQ", level=1, prompt_type="basic", refine=False):
         """
         Generate a question from text based on Bloom's Taxonomy.
 
@@ -47,15 +49,125 @@ class BloomQuestionGenerator:
         messages = [{"role": "system", "content": prompt[0]},
                     {"role": "user", "content": prompt[1]}]
         
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.5
-        )
+        valid = False
 
-        question = response.choices[0].message.content
+        while not valid:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.5
+            )
 
-        return question
+            question_dict = response.choices[0].message.content
+            valid = self.sanity_check(question_dict, question_type)
+
+        question_dict = json.loads(question_dict)
+
+        if refine:
+            question = question_dict["question"]
+            pred_level, is_correct = self.evaluate_question(question, level)
+            if not is_correct:
+                print(f"Refining question: {question} (predicted level: {pred_level}, ground truth level: {level})")
+                if question_type == "MCQ":
+                    # concatenate the question with the answer options
+                    question = question_dict["question"] + "\n"
+                    for letter, answer in question_dict["choices"].items():
+                        question += f"{letter}: {answer}\n"
+                    
+                question_dict = self.refine_question(question, text, pred_level, level, question_type)
+
+        return question_dict
+    
+
+    def refine_question(self, question, text, pred_level, gt_level, question_type="MCQ"):
+        """
+        Refine a generated question which has been not correctly classified by Bloom's Taxonomy with BloomBERT.
+
+        Args:
+            question (str): Question to refine.
+            text (str): Text to generate questions from.
+            pred_level (int): Predicted Bloom's Taxonomy level.
+            gt_level (int): Ground truth Bloom's Taxonomy level.
+            question_type (str): Type of question to generate. Options are "MCQ" or "SAQ".
+        
+        Returns:
+            str: Refined question.
+        """
+
+        refine_prompt = create_refine_prompt(text, question, question_type, BLOOM_TAXONOMY[gt_level], BLOOM_TAXONOMY[pred_level])
+
+        messages = [{"role": "system", "content": refine_prompt[0]},
+                    {"role": "user", "content": refine_prompt[1]}]
+        
+        valid = False
+
+        while not valid:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.5
+            )
+
+            refined_question_dict = response.choices[0].message.content
+
+            valid = self.sanity_check(refined_question_dict, question_type)
+
+        refined_question_dict = json.loads(refined_question_dict)
+
+        return refined_question_dict
+    
+    
+    def sanity_check(self, question_dict_str, question_type):
+        """
+        Perform a sanity check on the generated question.
+
+        Args:
+            question_dict_str (str): Generated question in string format.
+            question_type (str): Type of question to generate. Options are "MCQ" or "SAQ".
+
+        Returns:
+            bool: True if the question is valid, False otherwise.
+        """
+
+        try:
+            question_dict = json.loads(question_dict_str)
+        except json.JSONDecodeError:
+            print("Error decoding JSON string.")
+            print(f"Generated string: {question_dict_str}")
+            return False
+
+        try:
+            assert isinstance(question_dict, dict), "Question is not a dictionary."
+            assert "question" in question_dict, "Question is missing."
+            assert isinstance(question_dict["question"], str), "Question is not a string."
+            assert len(question_dict["question"]) > 0, "Question is empty."
+            
+            if question_type == "MCQ":
+                assert "choices" in question_dict, "Choices are missing."
+                assert len(question_dict["choices"]) == 4, "Number of answer options is not 4."
+                assert "A" in question_dict["choices"], "Answer option A is missing."
+                assert "B" in question_dict["choices"], "Answer option B is missing."
+                assert "C" in question_dict["choices"], "Answer option C is missing."
+                assert "D" in question_dict["choices"], "Answer option D is missing."
+                assert "answer" in question_dict, "Answer is missing."
+                assert question_dict["answer"] in ["A", "B", "C", "D"], "Answer is not one of the answer options."
+                assert all(isinstance(choice, str) for choice in question_dict["choices"].values()), "Answer options are not strings."
+            
+            elif question_type == "SAQ":
+                assert "correct_answer" in question_dict, "Answer is missing."
+                assert "incorrect_answer" in question_dict, "Incorrect answer is missing."
+                assert isinstance(question_dict["correct_answer"], str), "Correct answer is not a string."
+                assert isinstance(question_dict["incorrect_answer"], str), "Incorrect answer is not a string."
+                assert len(question_dict["correct_answer"]) > 0, "Correct answer is empty."
+                assert len(question_dict["incorrect_answer"]) > 0, "Incorrect answer is empty."
+            
+            return True
+        
+        except AssertionError as e:
+            print(f"Sanity check failed: {e}")
+            print(f"Generated string: {question_dict_str}")
+            return False
+
     
 
     def evaluate_question(self, question, level):
@@ -90,23 +202,83 @@ class BloomQuestionGenerator:
         except Exception as e:
             print(f"Error: {e}")
             return False
+        
 
 
-    def check_answer(self, question, answer):
+    def check_answer(self, text, question_dict, answer, question_type):
         """
         Check if the answer is correct for a given question.
 
         Args:
-            question (str): Question to check the answer for.
-            answer (str): Answer to the question.
+            text (str): Text from which the question was generated.
+            question_dict (dict): Dictionary containing the question and answer options.
+            answer (str): User answer to the question.
+            question_type (str): Type of question to check. Options are "MCQ" or "SAQ".
 
         Returns:
             bool: True if the answer is correct, False otherwise.
         """
 
-        # TODO: Implement answer checking
+        assert question_type in ["MCQ", "SAQ"], "Invalid question type. Options are 'MCQ' or 'SAQ."
 
-        pass
+        if question_type == "MCQ":
+            return question_dict["answer"] == answer, None
+        
+        elif question_type == "SAQ":
+            prompt = create_judge_prompt(text, question_dict["question"], answer)
+
+            messages = [{"role": "system", "content": prompt[0]},
+                        {"role": "user", "content": prompt[1]}]
+            
+            valid = False
+
+            while not valid:
+
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.5
+                )
+                
+                correction_dict_str = response.choices[0].message.content
+                valid = self.sanity_check_judge(correction_dict_str)
+            
+            correction_dict = json.loads(correction_dict_str)
+            return correction_dict["is_correct"], correction_dict["feedback"]
 
 
+        return False, None
+
+
+    def sanity_check_judge(self, correction_dict_str):
+        """
+        Perform a sanity check on the generated correction.
+
+        Args:
+            correction_dict_str (str): Generated correction in string format.
+
+        Returns:
+            bool: True if the correction is valid, False otherwise.
+        """
+
+        try:
+            correction_dict = json.loads(correction_dict_str)
+        except json.JSONDecodeError:
+            print("Error decoding JSON string.")
+            print(f"Generated string: {correction_dict_str}")
+            return False
+
+        try:
+            assert isinstance(correction_dict, dict), "Correction is not a dictionary."
+            assert "is_correct" in correction_dict, "is_correct is missing."
+            assert isinstance(correction_dict["is_correct"], bool), "is_correct is not a boolean."
+            assert "feedback" in correction_dict, "Feedback is missing."
+            assert isinstance(correction_dict["feedback"], str), "Feedback is not a string."
+            
+            return True
+        
+        except AssertionError as e:
+            print(f"Sanity check failed: {e}")
+            print(f"Generated string: {correction_dict_str}")
+            return False
     

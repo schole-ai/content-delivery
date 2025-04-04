@@ -23,9 +23,9 @@ def get_content(url="bolt://localhost:7687", username="neo4j", password="passwor
     Get content from Neo4j nodes.
 
     Args:
-        url: str, URL of the Neo4j database.
-        username: str, username for the Neo4j database.
-        password: str, password for the Neo4j database.
+        url (str): URL of the Neo4j database.
+        username (str): username for the Neo4j database.
+        password (str): password for the Neo4j database.
 
     Returns:
         list: List of dictionaries containing the node ID, content and name.
@@ -59,9 +59,9 @@ def save_to_file(docs, folder="data", filename="docs.json"):
     Save the synthetic documents to a JSON file.
     
     Args:
-        docs: list, List of dictionaries containing the node ID, content, name and chunks.
-        folder: str, Folder to save the JSON file.
-        filename: str, Name of the JSON file.
+        docs (list): List of dictionaries containing the node ID, content, name and chunks.
+        folder (str): Folder to save the JSON file.
+        filename (str): Name of the JSON file.
     """
 
     filepath = os.path.join(folder, filename)
@@ -80,10 +80,10 @@ def update_nodes(filepath="data/docs.json", url="bolt://localhost:7687", usernam
     Update the Neo4j graph with the document chunks.
     
     Args:
-        filepath: str, Path to the JSON file containing the synthetic documents.
-        url: str, URL of the Neo4j database.
-        username: str, Username for the Neo4j database.
-        password: str, Password for the Neo4j database.
+        filepath (str): Path to the JSON file containing the synthetic documents.
+        url (str): URL of the Neo4j database.
+        username (str): Username for the Neo4j database.
+        password (str): Password for the Neo4j database.
     """
 
     driver = connection(url, username, password)

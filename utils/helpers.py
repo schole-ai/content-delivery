@@ -5,11 +5,13 @@ def connection(url="bolt://localhost:7687", username="neo4j", password="password
     """
     Connect to a Neo4j database
 
-    :param url: URL of the Neo4j database
-    :param username: Username of the Neo4j database
-    :param password: Password of the Neo4j database
+    Args:
+        url (str): URL of the Neo4j database
+        username (str): Username for authentication
+        password (str): Password for authentication
     
-    :return: A Neo4j driver instance
+    Returns:
+        GraphDatabase: A Neo4j driver instance
     """
     try:
         driver = GraphDatabase.driver(url, auth=(username, password))
@@ -24,8 +26,9 @@ def display_chunks(chunks, num_chunks=None):
     """
     Display a list of text chunks in a table format
 
-    :param chunks: A list of text chunks
-    :param num_chunks: The number of chunks to display
+    Args:
+        chunks (list): List of text chunks to display
+        num_chunks (int, optional): Number of chunks to display. If None, display all chunks.
     """
 
     html_content = """
