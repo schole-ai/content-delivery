@@ -205,49 +205,56 @@ class BloomQuestionGenerator:
         
 
 
-    def check_answer(self, text, question_dict, answer, question_type):
+    def check_answer_saq(self, text, question, answer):
         """
-        Check if the answer is correct for a given question.
+        Check if the answer to a short answer question is correct.
 
         Args:
-            text (str): Text from which the question was generated.
+            text (str): Text to generate questions from.
+            question (str): Question to check the answer for.
+            answer (str): User answer to the question.
+
+        Returns:
+            tuple: (bool, str): Tuple containing a boolean indicating if the answer is correct and feedback.
+        """
+
+        prompt = create_judge_prompt(text, question, answer)
+
+        messages = [{"role": "system", "content": prompt[0]},
+                        {"role": "user", "content": prompt[1]}]
+            
+        valid = False
+
+        while not valid:
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.5
+            )
+            
+            correction_dict_str = response.choices[0].message.content
+            valid = self.sanity_check_judge(correction_dict_str)
+        
+        correction_dict = json.loads(correction_dict_str)
+        return correction_dict["is_correct"], correction_dict["feedback"]
+    
+
+    def check_answer_mcq(self, question_dict, answer):
+        """
+        Check if the answer to a multiple choice question is correct.
+
+        Args:
             question_dict (dict): Dictionary containing the question and answer options.
             answer (str): User answer to the question.
-            question_type (str): Type of question to check. Options are "MCQ" or "SAQ".
 
         Returns:
             bool: True if the answer is correct, False otherwise.
         """
 
-        assert question_type in ["MCQ", "SAQ"], "Invalid question type. Options are 'MCQ' or 'SAQ."
+        assert answer in ["A", "B", "C", "D"], "Answer is not one of the answer options."
 
-        if question_type == "MCQ":
-            return question_dict["answer"] == answer, None
-        
-        elif question_type == "SAQ":
-            prompt = create_judge_prompt(text, question_dict["question"], answer)
-
-            messages = [{"role": "system", "content": prompt[0]},
-                        {"role": "user", "content": prompt[1]}]
-            
-            valid = False
-
-            while not valid:
-
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=0.5
-                )
-                
-                correction_dict_str = response.choices[0].message.content
-                valid = self.sanity_check_judge(correction_dict_str)
-            
-            correction_dict = json.loads(correction_dict_str)
-            return correction_dict["is_correct"], correction_dict["feedback"]
-
-
-        return False, None
+        return question_dict["answer"] == answer
 
 
     def sanity_check_judge(self, correction_dict_str):

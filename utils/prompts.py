@@ -27,7 +27,6 @@ def create_prompt(text, question_type, level, prompt_type="basic"):
             "You will be provided with a text snippet from the course. "
             "Make sure the question is relevant to the text and is at the correct Bloom's Taxonomy level. "
             "The question should be naturally phrased and fully self-contained, without explicitly referencing the text snippet (e.g., avoid phrases like 'according to the text' or 'in the provided text'). "
-            # "Only output the question.\n"
             f"{output_format_prompt}\n"
         )
 
@@ -41,7 +40,6 @@ def create_prompt(text, question_type, level, prompt_type="basic"):
             "You will be provided with a text snippet from the course. "
             "Make sure the question is relevant to the text and is at the correct Bloom's Taxonomy level. "
             "The question should be naturally phrased and fully self-contained, without explicitly referencing the text snippet (e.g., avoid phrases like 'according to the text' or 'in the provided text'). "
-            # "Only output the question.\n"
             f"{output_format_prompt}\n"
         )
     
@@ -57,14 +55,12 @@ def create_prompt(text, question_type, level, prompt_type="basic"):
             "You will be provided with a text snippet from the course. "
             "Make sure the question is relevant to the text and is at the correct Bloom's Taxonomy level. "
             "The question should be naturally phrased and fully self-contained, without explicitly referencing the text snippet (e.g., avoid phrases like 'according to the text' or 'in the provided text'). "
-            # "Only output the question.\n"
             f"{output_format_prompt}\n"
         )
 
 
     context_user = (
         f"Text: {text}\n"
-        # "Question:"
     )
 
     return context_system, context_user
