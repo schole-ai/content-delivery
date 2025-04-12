@@ -7,6 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
 from openai import OpenAI
 from utils.prompts import create_prompt, create_refine_prompt, create_judge_prompt
+from utils.helpers import clean_pdf_text
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -59,6 +60,7 @@ class BloomQuestionGenerator:
             )
 
             question_dict = response.choices[0].message.content
+            question_dict = clean_pdf_text(question_dict)
             valid = self.sanity_check(question_dict, question_type)
 
         question_dict = json.loads(question_dict)
@@ -109,6 +111,7 @@ class BloomQuestionGenerator:
             )
 
             refined_question_dict = response.choices[0].message.content
+            refined_question_dict = clean_pdf_text(refined_question_dict)
 
             valid = self.sanity_check(refined_question_dict, question_type)
 
@@ -116,7 +119,7 @@ class BloomQuestionGenerator:
 
         return refined_question_dict
     
-    
+        
     def sanity_check(self, question_dict_str, question_type):
         """
         Perform a sanity check on the generated question.
@@ -134,6 +137,7 @@ class BloomQuestionGenerator:
         except json.JSONDecodeError:
             print("Error decoding JSON string.")
             print(f"Generated string: {question_dict_str}")
+            print("Raw:", repr(question_dict_str))
             return False
 
         try:

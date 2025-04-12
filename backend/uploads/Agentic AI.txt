@@ -1,0 +1,30 @@
+Agentic AI is a class of artificial intelligence that focuses on autonomous systems that can make decisions and perform tasks without human intervention. The independent systems automatically respond to conditions, to produce process results. The field is closely linked to agentic automation, also known as agent-based process management systems (APMS), when applied to process automation. Applications include software development, customer support, cybersecurity and business intelligence.
+
+
+== Core concept ==
+The core concept of agentic AI is the use of AI agents to perform automated tasks but without human intervention. While robotic process automation (RPA) and AI agents can be programmed to automate specific tasks or support rule-based decisions, the rules are usually fixed. Agentic AI operates independently, making decisions through continuous learning and analysis of external data and complex data sets. Functioning agents can require various AI techniques, such as natural language processing, machine learning (ML), and computer vision, depending on the environment.
+
+
+== History ==
+Some scholars trace the conceptual roots of agentic AI to Alan Turing's mid-20th century work with machine intelligence and Norbert Wiener's work on feedback systems. The term agent-based process management system (APMS) was used as far back as 1998 to describe the concept of using autonomous agents for business process management. The psychological principle of agency was also discussed in the 2008 work of sociologist Albert Bandura, who studied how humans can shape their environments. This research would shape how humans modeled and developed artificial intelligence agents. 
+Some additional milestones of agentic AI include IBM's Deep Blue, demonstrating how agency could work within a confined domain, advances in machine learning in the 2000s, AI being integrated into robotics, and the rise of generative AI such as OpenAI's GPT models.
+In 2025, research firm  Forrester named agentic AI a top emerging technology for 2025.
+
+
+== Applications ==
+Applications using agentic AI include:
+
+Software development - AI coding agents can write large pieces of code, and review it. Agents can even perform non-code related tasks such as reverse engineering specifications from code.
+Customer support automation - AI agents can improve customer service by improving the ability of chatbots to answer a wider variety of questions, rather than having a limited set of answers pre-programmed by humans.
+Enterprise workflows - AI agents can automatically automate routine tasks by processing pooled data, as opposed to a company needing APIs preprogrammed for specific tasks.
+Cybersecurity and threat detection - AI agents deployed for cybersecurity can automatically detect and mitigate threats in real time. Security responses can also be automated based on the type of threat.
+Business intelligence - AI agents can support business intelligence to produce more useful analytics, such as responding to natural language voice prompts.
+
+
+== Related concepts ==
+Agentic automation, sometimes referred to as agentic process automation, refers to applying agentic AI to generate and operate workflows. In one example, large language models can construct and execute automated (agentic) workflows, reducing or eliminating the need for human intervention. 
+While agentic AI is characterized by its decision-making and action-taking capabilities, generative AI is distinguished by its ability to generate original content based on learned patterns.
+Robotic process automation (RPA) describes how software tools can automate repetitive tasks, with predefined workflows and structured data handling. RPA's static instructions limit its value. Agentic AI is more dynamic, allowing unstructured data to be processed and analyzed, including contextual analysis, and allowing interaction with users.
+
+
+== References ==

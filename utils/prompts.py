@@ -127,6 +127,7 @@ def create_judge_prompt(text, question, answer):
         "You are a highly skilled AI tutor. "
         "You are given a question based on a text snippet from a student's course material and the student's answer. "
         "Your task is to determine if the answer is correct or incorrect and provide a short feedback to the student. "
+        "Your answer should not explcitly reference the text snippet (e.g., avoid phrases like 'according to the text' or 'in the provided text'). "
         "Respond ONLY with a valid JSON object. Do NOT include any additional text outside the JSON. "
         "The JSON object must contain the following fields:\n"
         "{\n"
