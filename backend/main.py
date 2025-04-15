@@ -46,7 +46,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     chunks = chunker.recursive_chunk(text, chunk_size=1000)
 
     SESSIONS[session_id] = {
-        "chunks": chunks[:2],
+        "chunks": chunks,
         "questions": [],
         "answers": [],
         "current_step": 0
@@ -74,7 +74,7 @@ def submit_answer(session_id: str, body: AnswerRequest = Body(...)):
 
     is_correct, feedback = question_generator.check_answer_saq(chunk, question, answer)
 
-    text_emoji = "Correct ✅. " if is_correct else "Incorrect ❌."
+    text_emoji = "Correct ✅." if is_correct else "Incorrect ❌."
 
     feedback = f"{text_emoji} {feedback}"
 

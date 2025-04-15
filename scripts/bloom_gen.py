@@ -6,7 +6,12 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
 from openai import OpenAI
-from utils.prompts import create_prompt, create_refine_prompt, create_judge_prompt
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from utils.prompts import create_prompt, create_refine_prompt, create_judge_prompt, create_multimodal_prompt
 from utils.helpers import clean_pdf_text
 from dotenv import load_dotenv
 
@@ -24,8 +29,13 @@ BLOOM_BERT_URL = "https://bloom-bert-api-dmkyqqzsta-as.a.run.app/predict"
 class BloomQuestionGenerator:
     """Class to generate questions based on Bloom's Taxonomy"""
     def __init__(self, model="gpt-4"):
-        self.model = model
+        self.model = model # Use "gpt-4o" to have multimodal capabilities
         self.client = OpenAI(api_key=OPENAI_API_KEY)
+        self.llm = ChatOpenAI(
+            model_name=self.model,
+            temperature=0.5,
+            openai_api_key=OPENAI_API_KEY,
+        )
     
 
     def generate_question(self, text, question_type="MCQ", level=1, prompt_type="basic", refine=False):
@@ -77,6 +87,33 @@ class BloomQuestionGenerator:
                         question += f"{letter}: {answer}\n"
                     
                 question_dict = self.refine_question(question, text, pred_level, level, question_type)
+
+        return question_dict
+    
+
+    def generate_question_from_multimodal(self, chunk_docs, question_type="MCQ", level=1, refine=False):
+
+        assert question_type in ["MCQ", "SAQ"], "Invalid question type. Options are 'MCQ' or 'SAQ."
+        assert level in range(1, 7), "Invalid Bloom's Taxonomy level. Level should be between 1 and 6."
+
+        prompt_content = create_multimodal_prompt(chunk_docs, question_type, BLOOM_TAXONOMY[level])
+
+        chat_template = ChatPromptTemplate.from_messages(
+            [
+                HumanMessage(content=prompt_content)
+            ]
+        )
+
+        valid = False
+
+        while not valid:
+            response = self.llm.invoke(chat_template.format_messages())
+            question_dict = response.content
+            question_dict = clean_pdf_text(question_dict)
+            valid = self.sanity_check(question_dict, question_type)
+
+
+        question_dict = json.loads(question_dict)
 
         return question_dict
     

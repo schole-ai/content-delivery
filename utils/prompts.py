@@ -144,7 +144,7 @@ def create_judge_prompt(text, question, answer):
 
     return context_system, context_user
 
-def get_task_prompt(question_type):
+def get_task_prompt(question_type, multimodal=False):
     """
     Get the task prompt based on the question type.
 
@@ -155,15 +155,20 @@ def get_task_prompt(question_type):
         str: The task prompt for the specified question type.
     """
 
+    if multimodal:
+        context = "context which can contain texts or images"
+    else:
+        context = "text snippet"
+
     if question_type == "MCQ":
         prompt = (
-            "Your task is to generate a well-structured, pedagogically sound multiple-choice question based on a given text snippet from a student's course material. "
+            f"Your task is to generate a well-structured, pedagogically sound multiple-choice question based on a given {context} from a student's course material. "
             "The multiple-choice question should have four answer choices (A, B, C, D), with only one correct answer. "
         )
         
     elif question_type == "SAQ":
         prompt = (
-            "Your task is to generate a well-structured, pedagogically sound short answer question based on a given text snippet from a student's course material. "
+            f"Your task is to generate a well-structured, pedagogically sound short answer question based on a given {context} from a student's course material. "
         )
     
     return prompt
@@ -182,8 +187,7 @@ def get_output_format(question_type):
 
     if question_type == "MCQ":
         prompt = (
-            "Respond ONLY with a valid JSON object. Do NOT include any additional text outside the JSON. "
-            "The JSON object must contain the following fields:\n"         
+            "Respond ONLY with a valid JSON object. DO NOT wrap the JSON in triple backticks or any other formatting. The JSON must contain: \n"  
             "{\n"
             "  \"question\": \"<full text question>\",\n"
             "  \"choices\": {\n"
@@ -198,8 +202,7 @@ def get_output_format(question_type):
         
     elif question_type == "SAQ":
         prompt = (
-            "Respond ONLY with a valid JSON object. Do NOT include any additional text outside the JSON. "
-            "The JSON object must contain the following fields:\n"
+            "Respond ONLY with a valid JSON object. DO NOT wrap the JSON in triple backticks or any other formatting. The JSON must contain: \n" 
             "{\n"
             "  \"question\": \"<full text question>\",\n"
             "  \"correct_answer\": \"<a possible correct answer>\"\n"
@@ -257,3 +260,40 @@ def get_bloom_level_examples(level):
     }
     
     return examples.get(level)
+
+
+def create_multimodal_prompt(chunk_docs, question_type, level):
+    print()
+    text_docs = [doc for doc in chunk_docs if doc.metadata["type"] == "text"]
+    img_docs = [doc for doc in chunk_docs if doc.metadata["type"] == "image"]
+    context_text = ""
+
+    if len(text_docs) > 0:
+        context_text = "\n".join([doc.page_content for doc in text_docs])
+
+    task_prompt = get_task_prompt(question_type, multimodal=True)
+    output_format_prompt = get_output_format(question_type)
+
+    prompt_template = (
+        "You are a highly skilled AI tutor specializing in education and Bloom's Taxonomy. "
+        f"{task_prompt}"
+        f"The Bloom's Taxonomy level for cognitive complexity is: {level}. The description of the level is: "
+        f"{get_bloom_level_prompt(level)}. "
+        "Make sure the question is relevant to the context and is at the correct Bloom's Taxonomy level. "
+        "The question should be naturally phrased and fully self-contained, without explicitly referencing the text snippet (e.g., avoid phrases like 'according to the text/context' or 'in the provided text'). "
+        f"{output_format_prompt}\n"
+        f"Context: {context_text}\n"
+    )
+
+    prompt_content = [{"type": "text", "text": prompt_template}]
+
+    if len(img_docs) > 0:
+        for img in img_docs:
+            prompt_content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{img.page_content}"},
+                }
+            )
+
+    return prompt_content
