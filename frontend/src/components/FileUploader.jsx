@@ -18,7 +18,10 @@ const FileUploader = ({ onUploadSuccess }) => {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'application/pdf': ['.pdf'] },
+    accept: {
+      'application/pdf': ['.pdf'],
+      'text/plain': ['.txt'],
+    },
     multiple: false,
   })
 
@@ -28,13 +31,14 @@ const FileUploader = ({ onUploadSuccess }) => {
       className="bg-white p-10 rounded-2xl shadow-xl border-2 border-dashed border-gray-300 text-center text-gray-600 hover:border-blue-400 transition-all duration-300"
     >
       <input {...getInputProps()} />
-      <h2 className="text-xl font-semibold mb-2">Upload your PDF</h2>
+      <h2 className="text-xl font-semibold mb-2">Upload your PDF or TXT file</h2>
       <p className="text-gray-500">
-        {isDragActive ? 'Drop the PDF here...' : 'Drag and drop a PDF file, or click to select'}
+        {isDragActive
+          ? 'Drop the file here...'
+          : 'Drag and drop a PDF or TXT file, or click to select'}
       </p>
     </div>
   )
 }
-
 
 export default FileUploader

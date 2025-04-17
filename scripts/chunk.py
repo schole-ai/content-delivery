@@ -32,11 +32,13 @@ SEPARATORS = ["\n\n", "\n", ".", "?", "!", " ", ""]
 
 class TextChunker:
     """A class which implements many methods for create bite-sized blocks of text."""
-    def __init__(self):
+    def __init__(self, text, output_document=True):
+        self.text = text
+        self.output_document = output_document
         self.embedding_model = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
         self.encoder_model = OpenAIEncoder(name="text-embedding-3-small")
-    
-    def recursive_chunk(self, text, chunk_size=500, chunk_overlap=0, by_tokens=False):
+
+    def recursive_chunk(self, chunk_size=500, chunk_overlap=0, by_tokens=False):
         """Chunk text recursively."""
         if by_tokens:
             splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(model_name="gpt-4", 
@@ -47,36 +49,48 @@ class TextChunker:
             splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, 
                                                       chunk_overlap=chunk_overlap,
                                                       separators=SEPARATORS)
-        return splitter.split_text(text)
+            
+        chunks = splitter.split_text(self.text)
+        return self.output_format(chunks)
 
-    def semantic_chunk(self, text):
+    def semantic_chunk(self):
         """Chunk text based on semantic similarity."""
         splitter = SemanticChunker(self.embedding_model)
-        return splitter.split_text(text)
+        chunks = splitter.split_text(self.text)
+        return self.output_format(chunks)
     
-    def cluster_chunk(self, text, max_chunk_size=500):
+    def cluster_chunk(self, max_chunk_size=500):
         """Chunk text based on clustering."""
         splitter = ClusterSemanticChunker(
             embedding_function=self.embedding_model.embed_documents,
             max_chunk_size=max_chunk_size
         )
-        return splitter.split_text(text)
+        chunks = splitter.split_text(self.text)
+        return self.output_format(chunks)
     
-    def statistical_chunk(self, text):
-        """Chunk text based on statistical methods."""
-        splitter = StatisticalChunker(encoder=self.encoder_model)
-        chunks = splitter(docs=[text])
-        return chunks
-    
-    def llm_chunk(self, text):
+    def llm_chunk(self):
         """Chunk text based on LLMs."""
         splitter = LLMSemanticChunker(
             organisation="openai",
             model_name="gpt-4o",
             api_key=OPENAI_API_KEY
         )
-        return splitter.split_text(text)
+        chunks = splitter.split_text(self.text)
+        return self.output_format(chunks)
 
+    def statistical_chunk(self):
+        """Chunk text based on statistical methods."""
+        splitter = StatisticalChunker(encoder=self.encoder_model)
+        chunks = splitter(docs=[self.text])[0]
+        chunk_texts = [' '.join(chunk.splits) for chunk in chunks]
+        return self.output_format(chunk_texts)
+    
+    def output_format(self, chunks):
+        """Format the output."""
+        if self.output_document:
+            return [[Document(page_content=chunk, metadata={"type": "text"})] for chunk in chunks]
+        return chunks
+    
 
 class PDFChunker:
     """A class which extracts content from PDFs and chunks it."""
@@ -84,6 +98,7 @@ class PDFChunker:
         self.pdf_path = pdf_path
         self.chunks = self.partition()
         self.formated_chunks = [self.format_chunk(chunk) for chunk in self.chunks]
+        self.chunks_img = [self.crop_chunk_on_page(chunk) for chunk in self.chunks]
 
     def partition(self):
         chunks = partition_pdf(

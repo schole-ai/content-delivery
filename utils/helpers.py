@@ -89,6 +89,25 @@ def load_pdf(file_path):
     
     return text
 
+def load_txt(file_path):
+    """
+    Load a text file
+
+    Args:
+        file_path (str): Path to the text file
+    
+    Returns:
+        str: Content of the text file
+    """
+    
+    assert file_path.endswith(".txt"), "File must be a TXT"
+    assert os.path.exists(file_path), "File does not exist"
+
+    with open(file_path, "r") as file:
+        text = file.read()
+    
+    return text
+
 
 def clean_pdf_text(text):
     """

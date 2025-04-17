@@ -8,8 +8,8 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
 from pydantic import BaseModel
 from scripts.bloom_gen import BloomQuestionGenerator
-from scripts.chunk import TextChunker
-from utils.helpers import load_pdf
+from scripts.chunk import TextChunker, PDFChunker
+from utils.helpers import load_pdf, load_txt
 
 
 class AnswerRequest(BaseModel):
@@ -42,7 +42,17 @@ async def upload_pdf(file: UploadFile = File(...)):
     with open(save_path, "wb") as f:
         f.write(await file.read())
     
-    text = load_pdf(save_path)
+    # check file type:
+    if save_path.endswith(".pdf"):
+        text = load_pdf(save_path)
+        # chunker = PDFChunker(pdf_path=save_path)
+    elif save_path.endswith(".txt"):
+        text = load_txt(save_path)
+        chunker = TextChunker()
+    else:
+        print("File type not supported")
+
+    
     chunks = chunker.recursive_chunk(text, chunk_size=1000)
 
     SESSIONS[session_id] = {
