@@ -1,4 +1,5 @@
 import os
+import io
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
@@ -94,30 +95,55 @@ class TextChunker:
 
 class PDFChunker:
     """A class which extracts content from PDFs and chunks it."""
-    def __init__(self, pdf_path):
+    def __init__(self, pdf_path=None, file_obj=None):
         self.pdf_path = pdf_path
+        self.file_obj = file_obj
         self.chunks = self.partition()
         self.formated_chunks = [self.format_chunk(chunk) for chunk in self.chunks]
         self.chunks_img = [self.crop_chunk_on_page(chunk) for chunk in self.chunks]
+        self.chunks_img_b64 = [self.pil_image_to_base64(chunk) for chunk in self.chunks_img]
 
-    def partition(self):
-        chunks = partition_pdf(
-            filename=self.pdf_path,
-            infer_table_structure=True,
-            strategy="hi_res", 
-            extract_image_block_types=["Image"],
-            extract_image_block_to_payload=True,
-            chunking_strategy="by_title", # or "basic"
-            max_characters=6000,
-            combine_text_under_n_chars=1500,
-            new_after_n_chars=4000,
-        )
+    def partition(self, max_characters=6000, combine_text_under_n_chars=1500, new_after_n_chars=4000):
+        """Partition the PDF into chunks."""
+        if self.file_obj:
+            chunks = partition_pdf(
+                file=self.file_obj,
+                infer_table_structure=True,
+                strategy="hi_res", 
+                extract_image_block_types=["Image"],
+                extract_image_block_to_payload=True,
+                chunking_strategy="by_title",
+                max_characters=max_characters,
+                combine_text_under_n_chars=combine_text_under_n_chars,
+                new_after_n_chars=new_after_n_chars,
+            )
+        elif self.pdf_path:
+            chunks = partition_pdf(
+                filename=self.pdf_path,
+                infer_table_structure=True,
+                strategy="hi_res", 
+                extract_image_block_types=["Image"],
+                extract_image_block_to_payload=True,
+                chunking_strategy="by_title",
+                max_characters=max_characters,
+                combine_text_under_n_chars=combine_text_under_n_chars,
+                new_after_n_chars=new_after_n_chars,
+            )
+        else:
+            raise ValueError("Either pdf_path or file_obj must be provided.")
 
         return chunks
     
     def get_image_base64(self, image_element: Image) -> str:
         """Get base64 code from image element."""
         return image_element.metadata.image_base64
+    
+    def pil_image_to_base64(self, image: PILImage) -> str:
+        """Convert PIL image to base64 string."""
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        return img_str
     
     def format_chunk(self, chunk):
         """Format chunk."""
@@ -154,7 +180,7 @@ class PDFChunker:
 
         imgs = []
         current_page_number = chunk.metadata.page_number
-        pages = convert_pdf_to_images(self.pdf_path)
+        pages = convert_pdf_to_images(pdf_path=self.pdf_path, file_obj=self.file_obj)
         page_image = pages[current_page_number - 1]
         img = page_image.copy()
         draw = ImageDraw.Draw(img)
@@ -201,37 +227,41 @@ class PDFChunker:
 
         imgs = []
         current_page_number = chunk.metadata.page_number
-        pages = convert_pdf_to_images(self.pdf_path)
+        pages = convert_pdf_to_images(pdf_path=self.pdf_path, file_obj=self.file_obj)
         page_image = pages[current_page_number - 1]
         img = page_image.copy()
 
         x0, y0, x1, y1 = [], [], [], []
 
-        for el in chunk.metadata.orig_elements:         
-            coords = el.metadata.coordinates.points
-            box = get_scaled_coords(coords, scale_x, scale_y)  
+        for el in chunk.metadata.orig_elements:
+            el_page_number = el.metadata.page_number
+            if el_page_number != current_page_number:
+                # Crop and store the previous page image
+                if x0 and y0 and x1 and y1:
+                    cropped_img = img.crop((min(x0), min(y0), max(x1), max(y1)))
+                    imgs.append(cropped_img)
 
+                # Reset for the new page
+                current_page_number = el_page_number
+                page_image = pages[current_page_number - 1]
+                img = page_image.copy()
+                x0, y0, x1, y1 = [], [], [], []
+
+            coords = el.metadata.coordinates.points
+            box = get_scaled_coords(coords, scale_x, scale_y) 
             x0.append(min(p[0] for p in box))
             y0.append(min(p[1] for p in box))
             x1.append(max(p[0] for p in box))
             y1.append(max(p[1] for p in box))
 
-            if el.metadata.page_number != current_page_number:
-                img = img.crop((min(x0), min(y0), max(x1), max(y1)))
-
-                x0, y0, x1, y1 = [], [], [], []
-
-                imgs.append(img)
-                current_page_number = el.metadata.page_number
-                page_image = pages[current_page_number - 1]
-                img = page_image.copy()
-
-        img = img.crop((min(x0), min(y0), max(x1), max(y1)))
-        imgs.append(img)
+        if x0 and y0 and x1 and y1:
+            cropped_img = img.crop((min(x0), min(y0), max(x1), max(y1)))
+            imgs.append(cropped_img)
 
         if combined:
             combined_img = self.combine_images_vertically(imgs, padding=0, bg_color=(255, 255, 255))
             return combined_img
+
         return imgs
     
     def combine_images_vertically(self, images, padding=0, bg_color=(255, 255, 255)):

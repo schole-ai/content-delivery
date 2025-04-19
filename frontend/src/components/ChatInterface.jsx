@@ -1,17 +1,24 @@
 import { useEffect, useState, useRef } from 'react'
+import ProgressBar from './ProgressBar' // Import the ProgressBar component
 
 const ChatInterface = ({ sessionId }) => {
-  const [chunk, setChunk] = useState('')
-  const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('')
-  const [lastAnswer, setLastAnswer] = useState('')
-  const [messages, setMessages] = useState([])
-  const [completed, setCompleted] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [loadingMessage, setLoadingMessage] = useState('Chunking and generating the first question...')
-  const [feedback, setFeedback] = useState('')
-  const [showFeedback, setShowFeedback] = useState(false)
-  const hasFetched = useRef(false)
+  const [chunk, setChunk] = useState('') // State to hold the current chunk of text
+  const [isImage, setIsImage] = useState(false) // State to track if the chunk is an image or text
+  const [question, setQuestion] = useState('') // State to hold the question related to the current chunk
+  const [questionType, setQuestionType] = useState('SAQ') // State to hold the type of question (SAQ or MCQ)
+  const [bloomLevel, setBloomLevel] = useState('') // State to hold the Bloom's taxonomy level
+  const [answer, setAnswer] = useState('')  // State to hold the user's answer
+  const [lastAnswer, setLastAnswer] = useState('')  // State to hold the last answer submitted by the user
+  const [messages, setMessages] = useState([]) // State to hold the conversation history
+  const [completed, setCompleted] = useState(false) // State to track if the course is completed
+  const [loading, setLoading] = useState(true)  // State to track if the app is loading or generating content
+  const [loadingMessage, setLoadingMessage] = useState('Chunking and generating the first question...') 
+  const [feedback, setFeedback] = useState('') // State to hold the feedback from the server
+  const [showFeedback, setShowFeedback] = useState(false) // State to control the visibility of feedback
+  const [progress, setProgress] = useState({ current: 0, total: 1, percent: 0 }) // State to track the progress of the course
+  const [fileLoaded, setFileLoaded] = useState(false);  // Track if the file is ready
+  const [questionStartTime, setQuestionStartTime] = useState(null); // State to track the amount of time spent on the question
+  const hasFetched = useRef(false) // Ref to track if the first chunk has been fetched
 
   // Fetch the first chunk and question
   const fetchNext = async () => {
@@ -19,20 +26,41 @@ const ChatInterface = ({ sessionId }) => {
     const data = await res.json()
     setChunk(data.chunk)
     setQuestion(data.question)
+    setIsImage(data.is_img)
+    setProgress(data.progress)
+    setQuestion(data.question)
+    setQuestionType(data.question_type)
+    setBloomLevel(data.bloom_level)
+    setQuestionStartTime(Date.now())
     setLoading(false)
+    setFileLoaded(true) 
+    
   }
 
   // Make sure to fetch the first chunk and question only once
   useEffect(() => {
+    const load = async () => {
+      setLoadingMessage('Chunking...')
+      setLoading(true)
+  
+      // Wait until backend finished processing
+      await fetch(`http://localhost:8000/process/${sessionId}`, { method: 'POST' })
+  
+      setLoadingMessage('Generating first chunk and question...')
+      await fetchNext()
+    }
+  
     if (!sessionId || hasFetched.current) return
     hasFetched.current = true
-    fetchNext()
+    load()
   }, [sessionId])
 
 
   // Get the answer from the user and generate feedback
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    const elapsedTime = Date.now() - questionStartTime;
 
     setLoadingMessage('Submitting answer...')
     setLoading(true)
@@ -42,7 +70,7 @@ const ChatInterface = ({ sessionId }) => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ answer }),
+      body: JSON.stringify({ answer, elapsed_time: elapsedTime }),
     })
   
     const data = await res.json()
@@ -55,8 +83,10 @@ const ChatInterface = ({ sessionId }) => {
     
     // Check if the course is completed
     if (data.is_last) {
+      setProgress(data.progress)
       setCompleted('pending')
     } else {
+      setProgress(data.progress)
       setCompleted(false)
     }
   }
@@ -65,7 +95,7 @@ const ChatInterface = ({ sessionId }) => {
   const handleContinue = async () => {
     setMessages((prev) => [
       ...prev,
-      { chunk, question, lastAnswer, answer, feedback },
+      { chunk, question, lastAnswer, answer, feedback, isImage, bloomLevel },
     ])
   
     setLoadingMessage('Loading next chunk...')
@@ -76,7 +106,12 @@ const ChatInterface = ({ sessionId }) => {
   
     setChunk(data.chunk)
     setQuestion(data.question)
+    setQuestion(data.question)
+    setQuestionType(data.question_type)
+    setBloomLevel(data.bloom_level)
+    setProgress(data.progress)
     setFeedback('')
+    setQuestionStartTime(Date.now())
     setShowFeedback(false)
     setLoading(false)
   }
@@ -94,11 +129,42 @@ const ChatInterface = ({ sessionId }) => {
 
   return (
     <div className="bg-white p-8 rounded-xl shadow-xl space-y-6">
+      {fileLoaded && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow px-4">
+          <div className="max-w-3xl mx-auto">
+            <ProgressBar {...progress} />
+          </div>
+        </div>
+      )}
       {messages.map((msg, idx) => (
         <div key={idx} className="border-b pb-4 mb-4 space-y-2">
           <p className="text-sm text-gray-400">Chunk {idx + 1}</p>
-          <p className="text-justify">{msg.chunk}</p>
-          <p className="mt-2 text-blue-700 font-semibold">Q: {msg.question}</p>
+          {msg.isImage ? (
+            <img
+              src={`data:image/png;base64,${msg.chunk}`}
+              alt={`PDF chunk ${idx + 1}`}
+              className="w-full rounded-lg shadow-md"
+            />
+          ) : (
+            <p className="text-justify">{msg.chunk}</p>
+          )}
+          
+          <p className="text-sm italic text-purple-600">
+            Bloom Level: <span className="font-semibold">{msg.bloomLevel}</span>
+          </p>
+
+          <div className="mt-2 text-blue-700 font-semibold">
+            <p>Q: {typeof msg.question === 'string' ? msg.question : msg.question.question}</p>
+            {msg.question.choices && (
+              <ul className="ml-4 mt-1 text-sm text-gray-800 space-y-1">
+                {Object.entries(msg.question.choices).map(([letter, choice]) => (
+                  <li key={letter}>
+                    <span className="font-medium">{letter}.</span> {choice}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <p className="text-gray-700"><span className="font-medium">You:</span> {msg.lastAnswer}</p>
           {msg.feedback && (
             <p className="text-sm text-green-700 mt-1">
@@ -108,64 +174,99 @@ const ChatInterface = ({ sessionId }) => {
         </div>
       ))}
 
-{loading ? (
-  <div className="flex items-center justify-center py-12 text-blue-600">
-    <svg className="animate-spin h-6 w-6 mr-3" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10"
-              stroke="currentColor" strokeWidth="4" fill="none" />
-      <path className="opacity-75" fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
-    <span>{loadingMessage}</span>
-  </div>
-) : showFeedback ? (
-  <div className="space-y-4">
-    <p className="text-green-700 text-lg font-medium">
-      <span className="font-bold">Feedback:</span> {feedback}
-    </p>
-    {completed === 'pending' ? (
-      <button
-        onClick={() => setCompleted(true)}
-        className="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 font-semibold shadow-md"
-      >
-        Finish
-      </button>
-    ) : (
-      <button
-        onClick={handleContinue}
-        className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-semibold shadow-md"
-      >
-        Continue
-      </button>
-    )}
-  </div>
-) : (
-  <div className="space-y-4">
-    <div>
-      <p className="text-sm text-gray-400">Current Chunk</p>
-      <p className="text-justify text-gray-800">{chunk}</p>
-    </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-12 text-blue-600">
+          <svg className="animate-spin h-6 w-6 mr-3" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10"
+                    stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span>{loadingMessage}</span>
+        </div>
+      ) : showFeedback ? (
+        <div className="space-y-4">
+          <p className="text-green-700 text-lg font-medium">
+            <span className="font-bold">Feedback:</span> {feedback}
+          </p>
+          {completed === 'pending' ? (
+            <button
+              onClick={() => setCompleted(true)}
+              className="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 font-semibold shadow-md"
+            >
+              Finish
+            </button>
+          ) : (
+            <button
+              onClick={handleContinue}
+              className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-semibold shadow-md"
+            >
+              Continue
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-gray-400">Current Chunk</p>
+            {isImage ? (
+              <img
+                src={`data:image/png;base64,${chunk}`}
+                alt="Current PDF chunk"
+                className="w-full rounded-lg shadow-md"
+              />
+            ) : (
+              <p className="text-justify text-gray-800">{chunk}</p>
+            )}
+          </div>
 
-    <p className="text-lg font-medium text-blue-700">{question}</p>
+          <p className="text-sm text-purple-600 italic">
+            Bloom Level: <span className="font-semibold">{bloomLevel}</span>
+          </p>
 
-    <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
-      <textarea
-        className="border p-3 rounded-lg resize-none shadow-sm focus:ring-2 focus:ring-blue-500"
-        rows={4}
-        value={answer}
-        onChange={(e) => setAnswer(e.target.value)}
-        placeholder="Write your answer here..."
-        required
-      />
-      <button
-        type="submit"
-        className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-semibold shadow-md"
-      >
-        Submit Answer
-      </button>
-    </form>
-  </div>
-)}
+          <p className="text-lg font-medium text-blue-700">
+            {questionType === 'MCQ' ? question.question : question}
+          </p>
+
+          <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
+            {questionType === 'MCQ' && (
+              <div className="space-y-2">
+                {Object.entries(question.choices).map(([key, val]) => (
+                  <label key={key} className="block">
+                    <input
+                      type="radio"
+                      name="mcq"
+                      value={key}
+                      checked={answer === key}
+                      onChange={() => setAnswer(key)}
+                      className="mr-2"
+                    />
+                    {key}. {val}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {questionType === 'SAQ' && (
+              <textarea
+                className="border p-3 rounded-lg resize-none shadow-sm focus:ring-2 focus:ring-blue-500"
+                rows={4}
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="Write your answer here..."
+                required
+              />
+            )}
+
+            <button
+              type="submit"
+              className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-semibold shadow-md"
+            >
+              Submit Answer
+            </button>
+          </form>
+        </div>
+      )}
 
     </div>
   )

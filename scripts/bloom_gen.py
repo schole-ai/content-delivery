@@ -292,4 +292,3 @@ class BloomQuestionGenerator:
             print(f"Sanity check failed: {e}")
             print(f"Generated string: {correction_dict_str}")
             return False
-    

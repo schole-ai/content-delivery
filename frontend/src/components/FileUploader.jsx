@@ -7,13 +7,18 @@ const FileUploader = ({ onUploadSuccess }) => {
     const formData = new FormData()
     formData.append('file', file)
 
-    const res = await fetch('http://localhost:8000/upload', {
+    const res = await fetch('http://localhost:8000/prepare', {
       method: 'POST',
       body: formData,
     })
 
     const data = await res.json()
     onUploadSuccess(data.session_id)
+
+    await fetch(`http://localhost:8000/process/${sessionId}`, {
+      method: 'POST',
+    })
+    
   }, [onUploadSuccess])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

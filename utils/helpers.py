@@ -4,7 +4,7 @@ import base64
 from neo4j import GraphDatabase
 from IPython.display import display, HTML, Image
 from PyPDF2 import PdfReader
-from pdf2image import convert_from_path
+from pdf2image import convert_from_path, convert_from_bytes
 
 def connection(url="bolt://localhost:7687", username="neo4j", password="password123") -> GraphDatabase:
     """
@@ -137,7 +137,7 @@ def display_base64_image(base64_code):
     display(Image(data=image_data))
 
 
-def convert_pdf_to_images(pdf_path, dpi=200):
+def convert_pdf_to_images(pdf_path=None, file_obj=None, dpi=200):
     """
     Convert each page of a PDF file to an image
 
@@ -149,7 +149,14 @@ def convert_pdf_to_images(pdf_path, dpi=200):
         list: List of images converted from the PDF 
     """
     # Convert PDF to images
-    return convert_from_path(pdf_path, dpi=dpi)
+    if pdf_path:
+        return convert_from_path(pdf_path, dpi=dpi)
+    elif file_obj:
+        file_obj.seek(0)
+        return convert_from_bytes(file_obj.read(), dpi=dpi)
+    else:
+        raise ValueError("Either pdf_path or file_obj must be provided")
+
 
 def get_scaled_coords(coords, scale_x=1.0, scale_y=1.0):
     """
