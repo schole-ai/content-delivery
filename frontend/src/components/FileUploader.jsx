@@ -1,13 +1,15 @@
 import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+
 const FileUploader = ({ onUploadSuccess }) => {
   const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0]
     const formData = new FormData()
     formData.append('file', file)
 
-    const res = await fetch('http://localhost:8000/prepare', {
+    const res = await fetch(`${BACKEND_URL}/prepare`, {
       method: 'POST',
       body: formData,
     })
@@ -15,7 +17,7 @@ const FileUploader = ({ onUploadSuccess }) => {
     const data = await res.json()
     onUploadSuccess(data.session_id)
 
-    await fetch(`http://localhost:8000/process/${sessionId}`, {
+    await fetch(`${BACKEND_URL}/process/${sessionId}`, {
       method: 'POST',
     })
     

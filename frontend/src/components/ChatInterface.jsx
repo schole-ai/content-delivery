@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from 'react'
 import ProgressBar from './ProgressBar' // Import the ProgressBar component
 import EmojiFeedback from './EmojiFeedback'
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+
 const ChatInterface = ({ sessionId }) => {
   const [chunk, setChunk] = useState('') // State to hold the current chunk of text
   const [isImage, setIsImage] = useState(false) // State to track if the chunk is an image or text
@@ -26,7 +28,7 @@ const ChatInterface = ({ sessionId }) => {
 
   // Fetch the first chunk and question
   const fetchNext = async () => {
-    const res = await fetch(`http://localhost:8000/chunk/${sessionId}`)
+    const res = await fetch(`${BACKEND_URL}/chunk/${sessionId}`);
     const data = await res.json()
     setChunk(data.chunk)
     setQuestion(data.question)
@@ -48,7 +50,7 @@ const ChatInterface = ({ sessionId }) => {
       setLoading(true)
   
       // Wait until backend finished processing
-      await fetch(`http://localhost:8000/process/${sessionId}`, { method: 'POST' })
+      await fetch(`${BACKEND_URL}/process/${sessionId}`, { method: 'POST' })
   
       setLoadingMessage('Generating first chunk and question...')
       await fetchNext()
@@ -69,7 +71,7 @@ const ChatInterface = ({ sessionId }) => {
     setLoadingMessage('Submitting answer...')
     setLoading(true)
   
-    const res = await fetch(`http://localhost:8000/answer/${sessionId}`, {
+    const res = await fetch(`${BACKEND_URL}/answer/${sessionId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -108,7 +110,7 @@ const ChatInterface = ({ sessionId }) => {
     setLoadingMessage('Loading next chunk...')
     setLoading(true)
   
-    const res = await fetch(`http://localhost:8000/chunk/${sessionId}`)
+    const res = await fetch(`${BACKEND_URL}/chunk/${sessionId}`)
     const data = await res.json()
   
     setChunk(data.chunk)

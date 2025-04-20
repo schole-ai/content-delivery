@@ -34,10 +34,12 @@ class FeedbackRequest(BaseModel):
 
 app = FastAPI()
 
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
 # Allow frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  
+    allow_origins=[FRONTEND_URL],  
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -9,7 +9,7 @@ const EmojiFeedback = ({ sessionId, onSubmitted, isFinal = false }) => {
         onSubmitted()
       }, 2000)
 
-      await fetch(`http://localhost:8000/feedback/${sessionId}`, {
+      await fetch(`${BACKEND_URL}/feedback/${sessionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, rating }),
