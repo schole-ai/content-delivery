@@ -5,8 +5,11 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
-from openai import OpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
 from utils.prompts import create_prompt, create_refine_prompt, create_judge_prompt
+from utils.helpers import clean_pdf_text
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,20 +25,25 @@ BLOOM_BERT_URL = "https://bloom-bert-api-dmkyqqzsta-as.a.run.app/predict"
 
 class BloomQuestionGenerator:
     """Class to generate questions based on Bloom's Taxonomy"""
-    def __init__(self, model="gpt-4"):
-        self.model = model
-        self.client = OpenAI(api_key=OPENAI_API_KEY)
+    def __init__(self, model="gpt-4o"):
+        self.model = model # Use "gpt-4o" to have multimodal capabilities
+        self.llm = ChatOpenAI(
+            model_name=self.model,
+            temperature=0.5,
+            openai_api_key=OPENAI_API_KEY,
+        )
     
 
-    def generate_question(self, text, question_type="MCQ", level=1, prompt_type="basic", refine=False):
+    def generate_question(self, docs, question_type="MCQ", level=1, prompt_type="basic", refine=False):
         """
-        Generate a question from text based on Bloom's Taxonomy.
+        Generate a question from a chunk based on Bloom's Taxonomy.
 
         Args:
-            text (str): Text to generate questions from.
+            docs (list): List of documents to generate questions from.
             question_type (str): Type of question to generate. Options are "MCQ" or "SAQ".
             level (int): Bloom's Taxonomy level to generate questions from.
             prompt_type (str): Type of prompt to use. Options are "basic" or "description".
+            refine (bool): Whether to refine the question if it is not correctly classified by Bloom's Taxonomy.
         
         Returns:
             str: Generated question.
@@ -44,21 +52,21 @@ class BloomQuestionGenerator:
         assert question_type in ["MCQ", "SAQ"], "Invalid question type. Options are 'MCQ' or 'SAQ."
         assert level in range(1, 7), "Invalid Bloom's Taxonomy level. Level should be between 1 and 6."
 
-        prompt = create_prompt(text, question_type, BLOOM_TAXONOMY[level], prompt_type)
+        system_msg, prompt_content = create_prompt(docs, question_type, BLOOM_TAXONOMY[level], prompt_type)
        
-        messages = [{"role": "system", "content": prompt[0]},
-                    {"role": "user", "content": prompt[1]}]
+        chat_template = ChatPromptTemplate.from_messages(
+            [
+                SystemMessage(content=system_msg),
+                HumanMessage(content=prompt_content)
+            ]
+        )
         
-        valid = False
+        valid = False # Flag to check if the generated question follows the correct format (see sanity_check method)
 
         while not valid:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.5
-            )
-
-            question_dict = response.choices[0].message.content
+            response = self.llm.invoke(chat_template.format_messages())
+            question_dict = response.content
+            question_dict = clean_pdf_text(question_dict)
             valid = self.sanity_check(question_dict, question_type)
 
         question_dict = json.loads(question_dict)
@@ -74,18 +82,18 @@ class BloomQuestionGenerator:
                     for letter, answer in question_dict["choices"].items():
                         question += f"{letter}: {answer}\n"
                     
-                question_dict = self.refine_question(question, text, pred_level, level, question_type)
+                question_dict = self.refine_question(question, docs, pred_level, level, question_type)
 
         return question_dict
     
 
-    def refine_question(self, question, text, pred_level, gt_level, question_type="MCQ"):
+    def refine_question(self, question, docs, pred_level, gt_level, question_type="MCQ"):
         """
         Refine a generated question which has been not correctly classified by Bloom's Taxonomy with BloomBERT.
 
         Args:
             question (str): Question to refine.
-            text (str): Text to generate questions from.
+            docs (list): List of documents to generate questions from.
             pred_level (int): Predicted Bloom's Taxonomy level.
             gt_level (int): Ground truth Bloom's Taxonomy level.
             question_type (str): Type of question to generate. Options are "MCQ" or "SAQ".
@@ -94,29 +102,112 @@ class BloomQuestionGenerator:
             str: Refined question.
         """
 
-        refine_prompt = create_refine_prompt(text, question, question_type, BLOOM_TAXONOMY[gt_level], BLOOM_TAXONOMY[pred_level])
+        system_msg, prompt_content = create_refine_prompt(docs, question, question_type, BLOOM_TAXONOMY[gt_level], BLOOM_TAXONOMY[pred_level])
 
-        messages = [{"role": "system", "content": refine_prompt[0]},
-                    {"role": "user", "content": refine_prompt[1]}]
-        
+        chat_template = ChatPromptTemplate.from_messages(
+            [
+                SystemMessage(content=system_msg),
+                HumanMessage(content=prompt_content)
+            ]
+        )
+
         valid = False
 
         while not valid:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.5
-            )
-
-            refined_question_dict = response.choices[0].message.content
-
+            response = self.llm.invoke(chat_template.format_messages())
+            refined_question_dict = response.content
+            refined_question_dict = clean_pdf_text(refined_question_dict)
             valid = self.sanity_check(refined_question_dict, question_type)
 
         refined_question_dict = json.loads(refined_question_dict)
 
         return refined_question_dict
     
+
+    def evaluate_question(self, question, level):
+        """
+        Evaluate the Bloom's Taxonomy level of a generated question using BloomBERT.
+
+        Args:
+            question (str): Question to evaluate.
+            level (int): Bloom's Taxonomy level to compare with (ground truth).
+
+        Returns:
+            bool: True if the question is at the correct Bloom's Taxonomy level, False otherwise.
+        """
+
+        assert level in range(1, 7), "Invalid Bloom's Taxonomy level. Level should be between 1 and 6."
+
+        question_data = {"text": question}
+
+        try:
+            response = requests.post(BLOOM_BERT_URL, json=question_data)
+
+            response.raise_for_status()
+
+            response_dict = response.json()
+
+            predicted_level = BLOOM_BERT_MAP.get(response_dict.get("blooms_level"))
+
+            return predicted_level, predicted_level == level
+
+        except Exception as e:
+            print(f"Error: {e}")
+            return False        
+
+
+    def check_answer_saq(self, docs, question, answer):
+        """
+        Check if the answer to a short answer question is correct.
+
+        Args:
+            docs (list): List of documents to check the answer against.
+            question (str): Question to check the answer for.
+            answer (str): User answer to the question.
+
+        Returns:
+            tuple: (bool, str): Tuple containing a boolean indicating if the answer is correct and feedback.
+        """
+
+        system_msg, prompt_content = create_judge_prompt(docs, question, answer)
+
+        chat_template = ChatPromptTemplate.from_messages(
+            [
+                SystemMessage(content=system_msg),
+                HumanMessage(content=prompt_content)
+            ]
+        )
+            
+        valid = False
+
+        while not valid:
+            response = self.llm.invoke(chat_template.format_messages())
+            correction_dict_str = response.content
+            correction_dict_str = clean_pdf_text(correction_dict_str)
+            valid = self.sanity_check_judge(correction_dict_str)
+        
+        correction_dict = json.loads(correction_dict_str)
+
+        return correction_dict["is_correct"], correction_dict["feedback"]
     
+
+    def check_answer_mcq(self, question_dict, answer):
+        """
+        Check if the answer to a multiple choice question is correct.
+
+        Args:
+            question_dict (dict): Dictionary containing the question and answer options.
+            answer (str): User answer to the question.
+
+        Returns:
+            bool: True if the answer is correct, False otherwise.
+        """
+
+        assert answer in ["A", "B", "C", "D"], "Answer is not one of the answer options."
+
+        return question_dict["answer"] == answer
+    
+
     def sanity_check(self, question_dict_str, question_type):
         """
         Perform a sanity check on the generated question.
@@ -134,6 +225,7 @@ class BloomQuestionGenerator:
         except json.JSONDecodeError:
             print("Error decoding JSON string.")
             print(f"Generated string: {question_dict_str}")
+            print("Raw:", repr(question_dict_str))
             return False
 
         try:
@@ -167,95 +259,7 @@ class BloomQuestionGenerator:
             print(f"Sanity check failed: {e}")
             print(f"Generated string: {question_dict_str}")
             return False
-
-    
-
-    def evaluate_question(self, question, level):
-        """
-        Evaluate the Bloom's Taxonomy level of a generated question using BloomBERT.
-
-        Args:
-            question (str): Question to evaluate.
-            level (int): Bloom's Taxonomy level to compare with (ground truth).
-
-        Returns:
-            bool: True if the question is at the correct Bloom's Taxonomy level, False otherwise.
-        """
-
-        assert level in range(1, 7), "Invalid Bloom's Taxonomy level. Level should be between 1 and 6."
-
-        question_data = {"text": question}
-
-        try:
-
-            response = requests.post(BLOOM_BERT_URL, json=question_data)
-
-            response.raise_for_status()
-
-            response_dict = response.json()
-            # print(response_dict)
-
-            predicted_level = BLOOM_BERT_MAP.get(response_dict.get("blooms_level"))
-
-            return predicted_level, predicted_level == level
-
-        except Exception as e:
-            print(f"Error: {e}")
-            return False
         
-
-
-    def check_answer_saq(self, text, question, answer):
-        """
-        Check if the answer to a short answer question is correct.
-
-        Args:
-            text (str): Text to generate questions from.
-            question (str): Question to check the answer for.
-            answer (str): User answer to the question.
-
-        Returns:
-            tuple: (bool, str): Tuple containing a boolean indicating if the answer is correct and feedback.
-        """
-
-        prompt = create_judge_prompt(text, question, answer)
-
-        messages = [{"role": "system", "content": prompt[0]},
-                        {"role": "user", "content": prompt[1]}]
-            
-        valid = False
-
-        while not valid:
-
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.5
-            )
-            
-            correction_dict_str = response.choices[0].message.content
-            valid = self.sanity_check_judge(correction_dict_str)
-        
-        correction_dict = json.loads(correction_dict_str)
-        return correction_dict["is_correct"], correction_dict["feedback"]
-    
-
-    def check_answer_mcq(self, question_dict, answer):
-        """
-        Check if the answer to a multiple choice question is correct.
-
-        Args:
-            question_dict (dict): Dictionary containing the question and answer options.
-            answer (str): User answer to the question.
-
-        Returns:
-            bool: True if the answer is correct, False otherwise.
-        """
-
-        assert answer in ["A", "B", "C", "D"], "Answer is not one of the answer options."
-
-        return question_dict["answer"] == answer
-
 
     def sanity_check_judge(self, correction_dict_str):
         """
@@ -288,4 +292,3 @@ class BloomQuestionGenerator:
             print(f"Sanity check failed: {e}")
             print(f"Generated string: {correction_dict_str}")
             return False
-    
