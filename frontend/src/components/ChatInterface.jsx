@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import ProgressBar from './ProgressBar' // Import the ProgressBar component
+import EmojiFeedback from './EmojiFeedback'
 
 const ChatInterface = ({ sessionId }) => {
   const [chunk, setChunk] = useState('') // State to hold the current chunk of text
@@ -18,7 +19,10 @@ const ChatInterface = ({ sessionId }) => {
   const [progress, setProgress] = useState({ current: 0, total: 1, percent: 0 }) // State to track the progress of the course
   const [fileLoaded, setFileLoaded] = useState(false);  // Track if the file is ready
   const [questionStartTime, setQuestionStartTime] = useState(null); // State to track the amount of time spent on the question
+  const [midFeedbackShown, setMidFeedbackShown] = useState(false)
+  const [endFeedbackShown, setEndFeedbackShown] = useState(false)
   const hasFetched = useRef(false) // Ref to track if the first chunk has been fetched
+  const currentChunkRef = useRef(null) // Ref to hold the current chunk of text
 
   // Fetch the first chunk and question
   const fetchNext = async () => {
@@ -88,6 +92,9 @@ const ChatInterface = ({ sessionId }) => {
     } else {
       setProgress(data.progress)
       setCompleted(false)
+      setTimeout(() => {
+        currentChunkRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);      
     }
   }
 
@@ -114,21 +121,35 @@ const ChatInterface = ({ sessionId }) => {
     setQuestionStartTime(Date.now())
     setShowFeedback(false)
     setLoading(false)
+    setTimeout(() => {
+      currentChunkRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);    
   }
   
 
   // If the course is completed, show a completion message
-  if (completed === true) {
+  if (completed === true && !endFeedbackShown) {
     return (
-      <div className="bg-white p-10 rounded-xl shadow-xl text-center">
-        <h2 className="text-3xl font-bold text-green-600 mb-2">🎉 Course Completed!</h2>
+      <div className="bg-white p-10 rounded-xl shadow-xl text-center space-y-6">
+        <h2 className="text-3xl font-bold text-green-600">🎉 Course Completed!</h2>
         <p className="text-gray-600">Great job answering all the questions!</p>
+        <EmojiFeedback sessionId={sessionId} onSubmitted={() => setEndFeedbackShown(true)} isFinal={true} />
       </div>
     )
   }
+  
+  if (completed === true && endFeedbackShown) {
+    return (
+      <div className="bg-white p-10 rounded-xl shadow-xl text-center">
+        <h2 className="text-3xl font-bold text-green-600 mb-2">🎉 Course Completed!</h2>
+        <p className="text-gray-600">Thanks for your feedback. See you next time!</p>
+      </div>
+    )
+  }
+  
 
   return (
-    <div className="bg-white p-8 rounded-xl shadow-xl space-y-6">
+    <div className="bg-white p-8 rounded-xl shadow-xl space-y-6 mt-20">
       {fileLoaded && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow px-4">
           <div className="max-w-3xl mx-auto">
@@ -148,7 +169,7 @@ const ChatInterface = ({ sessionId }) => {
           ) : (
             <p className="text-justify">{msg.chunk}</p>
           )}
-          
+
           <p className="text-sm italic text-purple-600">
             Bloom Level: <span className="font-semibold">{msg.bloomLevel}</span>
           </p>
@@ -173,6 +194,13 @@ const ChatInterface = ({ sessionId }) => {
           )}
         </div>
       ))}
+
+      {progress.total > 2 &&
+      progress.current === Math.floor(progress.total / 2) &&
+      !midFeedbackShown && (
+        <EmojiFeedback sessionId={sessionId} onSubmitted={() => setMidFeedbackShown(true)} />
+      )}
+
 
       {loading ? (
         <div className="flex items-center justify-center py-12 text-blue-600">
@@ -207,7 +235,7 @@ const ChatInterface = ({ sessionId }) => {
         </div>
       ) : (
         <div className="space-y-4">
-          <div>
+          <div ref={currentChunkRef}>
             <p className="text-sm text-gray-400">Current Chunk</p>
             {isImage ? (
               <img

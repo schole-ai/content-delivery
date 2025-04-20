@@ -12,6 +12,13 @@ from io import BytesIO
 from scripts.bloom_gen import BloomQuestionGenerator
 from scripts.chunk import TextChunker, PDFChunker
 from scripts.learner import LearningTracker
+from dotenv import load_dotenv
+from supabase import create_client
+
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 BLOOM_MAP = {"remember": 1, "understand": 2, "apply": 3, "analyze": 4, "evaluate": 5, "create": 6}
 BLOOM_MAP_REVERSE = {v: k for k, v in BLOOM_MAP.items()}
@@ -19,6 +26,11 @@ BLOOM_MAP_REVERSE = {v: k for k, v in BLOOM_MAP.items()}
 class AnswerRequest(BaseModel):
     answer: str
     elapsed_time: Optional[int] = None
+
+class FeedbackRequest(BaseModel):
+    session_id: str
+    value: int
+    location: str
 
 app = FastAPI()
 
@@ -165,3 +177,21 @@ def submit_answer(session_id: str, body: AnswerRequest = Body(...)):
                     "percent": int(((step) / total_chunks) * 100)
                 }
             }
+    
+@app.post("/feedback/{session_id}")
+def submit_feedback(data: dict = Body(...)):
+    try:
+        session_id = data.get("session_id")
+        rating = data.get("rating")
+
+        if not session_id or rating is None:
+            return {"status": "error", "message": "Missing session_id or rating"}
+
+        supabase.table("feedback").insert({
+            "session_id": session_id,
+            "rating": rating
+        }).execute()
+
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
