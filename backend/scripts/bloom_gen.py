@@ -10,8 +10,8 @@ from copy import deepcopy
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from backend.utils.prompts import create_prompt, create_refine_prompt, create_judge_prompt
-from backend.utils.helpers import clean_pdf_text
+from ..utils.prompts import create_prompt, create_refine_prompt, create_judge_prompt
+from ..utils.helpers import clean_pdf_text
 from dotenv import load_dotenv
 
 load_dotenv()
