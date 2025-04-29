@@ -4,7 +4,7 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
-from utils.helpers import *
+from backend.utils.helpers import *
 
 from unstructured.documents.elements import Footer, Header, Image
 from PIL import Image as PILImage, ImageDraw

@@ -2,14 +2,16 @@ import os
 import json
 import requests
 import sys
+import random
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
+from copy import deepcopy
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from utils.prompts import create_prompt, create_refine_prompt, create_judge_prompt
-from utils.helpers import clean_pdf_text
+from backend.utils.prompts import create_prompt, create_refine_prompt, create_judge_prompt
+from backend.utils.helpers import clean_pdf_text
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -84,6 +86,10 @@ class BloomQuestionGenerator:
                     
                 question_dict = self.refine_question(question, docs, pred_level, level, question_type)
 
+        # if the question type is MCQ, shuffle the answer options to make sure the correct answer is not always in the same position due to the prompt
+        if question_type == "MCQ":
+            question_dict = self.shuffle_mcq(question_dict)
+
         return question_dict
     
 
@@ -122,6 +128,34 @@ class BloomQuestionGenerator:
         refined_question_dict = json.loads(refined_question_dict)
 
         return refined_question_dict
+    
+
+    def shuffle_mcq(self, question_dict):
+        """
+        Shuffle the answer options of a multiple choice question.
+
+        Args:
+            question_dict (dict): Dictionary containing the question and answer options.
+
+        Returns:
+            dict: Dictionary with shuffled answer options.
+        """
+        new_qdict = deepcopy(question_dict)
+
+        correct_text = question_dict['choices'][question_dict['answer']]
+        all_texts = list(question_dict['choices'].values())
+        random.shuffle(all_texts)
+
+        letters = ["A", "B", "C", "D"]
+        new_choices = dict(zip(letters, all_texts))
+
+        for letter, text in new_choices.items():
+            if text == correct_text:
+                new_qdict['answer'] = letter
+                break
+
+        new_qdict['choices'] = new_choices
+        return new_qdict
     
 
     def evaluate_question(self, question, level):

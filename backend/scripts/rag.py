@@ -17,16 +17,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-EMBEDDING_LEN = 1536
+EMBEDDING_LEN = 1536 
 
 class Retriever(ABC):
+    """Abstract base class for document retrievers."""
     def __init__(self, url, username, password, node_id, doc_property="documents", doc_embeddings_property="doc_embeddings"):
         self.url = url
         self.username = username
         self.password = password
         self.node_id = node_id
-        self.doc_property = doc_property
-        self.doc_embeddings_property = doc_embeddings_property
+        self.doc_property = doc_property # Property name in the node for the list of documents
+        self.doc_embeddings_property = doc_embeddings_property # Property name in the node for the list of embeddings
         self.embedding_model = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
         self.driver = connection(url, username, password)
         self.docs = self.get_documents()
@@ -70,6 +71,43 @@ class Retriever(ABC):
         
 
         return embeddings
+    
+
+class EuclideanRetriever(Retriever):
+    def __init__(self, url, username, password, node_id, doc_property="documents", doc_embeddings_property="doc_embeddings"):
+        super().__init__(url, username, password, node_id, doc_property, doc_embeddings_property)
+
+    def retrieve_top_k(self, query, k=1):
+        """
+        Retrieve the top k documents based on Euclidean distance.
+
+        Args:
+            query (str): The query to search for.
+            k (int): The number of documents to retrieve.
+
+        Returns:
+            list: The top k documents.
+        """
+
+        start_time = time.time()
+
+        query_embedding = self.embedding_model.embed_query(query)
+        query_embedding = np.array(query_embedding).reshape(1, -1)
+        
+        # Calculate Euclidean distance
+        distances = np.linalg.norm(self.embeddings - query_embedding, axis=1)
+        
+        # Get top k indices
+        top_k_indices = distances.argsort()[:k]
+        
+        # Get top k documents
+        top_k_docs = [self.docs[i] for i in top_k_indices]
+
+        end_time = time.time()
+
+        print(f"Retrieval time: {end_time - start_time:.2f} seconds")
+        
+        return top_k_indices, top_k_docs
     
     
 class CosineRetriever(Retriever):

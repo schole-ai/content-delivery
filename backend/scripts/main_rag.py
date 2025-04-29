@@ -1,8 +1,11 @@
 import os
+import sys
 import argparse
 
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
+
 from scripts.neo4j_rag import KnowledgeGraphRAG
-from scripts.rag import CosineRetriever, FaissRetriever
+from scripts.rag import EuclideanRetriever, CosineRetriever, FaissRetriever
 from scripts.bloom_gen import BloomQuestionGenerator
 
 from utils.helpers import *
@@ -14,6 +17,8 @@ def main(args, query):
     # for key, value in results.items():
     #     print(f"{key}: {value['name'], value['content']}")
 
+    retriever = EuclideanRetriever(args.url, args.username, args.password, node_id=1769)
+    idx, top_doc = retriever.retrieve_top_k(query, k=1)
     retriever = CosineRetriever(args.url, args.username, args.password, node_id=1769)
     idx, top_doc = retriever.retrieve_top_k(query, k=1)
     retriever = FaissRetriever(args.url, args.username, args.password, node_id=1769)
