@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
 from utils.helpers import *
 
-from unstructured.documents.elements import Footer, Header, Image
+from unstructured.documents.elements import Footer, Header, Image, Table
 from PIL import Image as PILImage, ImageDraw
 
 
@@ -157,6 +157,9 @@ class PDFChunker:
                 b64_code = self.get_image_base64(element)
                 if b64_code:
                     images.append(Document(page_content=b64_code, metadata={"type": "image"}))
+                continue
+            if isinstance(element, Table):
+                texts.append(Document(page_content=element.metadata.text_as_html, metadata={"type": "text"}))
                 continue
             if hasattr(element, "text"):
                 texts.append(Document(page_content=element.text.strip(), metadata={"type": "text"}))

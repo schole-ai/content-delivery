@@ -24,8 +24,8 @@ const EmojiFeedback = ({ sessionId, onSubmitted, isFinal = false }) => {
           <>
             <p className="text-lg font-medium mb-2 text-yellow-800">
               {isFinal
-                ? 'How did you enjoy the course overall?'
-                : 'How are you enjoying the course so far?'}
+                ? 'How did you enjoy the application overall?'
+                : 'How are you enjoying the application so far?'}
             </p>
             <div className="flex space-x-3 text-3xl">
               {[1, 2, 3, 4, 5].map((rating) => (

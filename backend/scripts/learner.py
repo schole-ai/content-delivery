@@ -6,21 +6,19 @@ BLOOM_MAP_REVERSE = {v: k for k, v in BLOOM_MAP.items()}
 
 class LearningTracker:
     """Class to track the learning progress of a user."""
-    def __init__(self, id, strategy="default", min_question_per_level=2, until_success=False):
-        self.id = id
+    def __init__(self, session_id, strategy="default", min_success_question=2, max_fail_question=2, supabase=None):
+        self.session_id = session_id
         self.strategy = strategy    # strategy to change the level, can be "default", "revert" or "random"
-        self.min_question_per_level = min_question_per_level # minimum number of questions to be answered at each level before moving to the next level, 
-                                                             # if until_success is True, this is the minimum number of questions answered correctly 
-                                                             # at each level before moving to the next level
-        self.until_success = until_success # change the level only if the user answers the question correctly
-        self.loop_count = 0 # number of times the user has looped through the levels
+        self.min_success_question = min_success_question # minimum number of questions to be answered correctly at each level before moving to the next level
+        self.max_fail_question = max_fail_question # maximum number of questions to be answered incorrectly at each level before moving back to the previous level
         self.current_level = None
         self.logs = self.initialize_logs()
+        self.supabase = supabase  # Supabase client for storing logs
 
     
     def initialize_logs(self):
         return {
-            "id": self.id,
+            "session_id": self.session_id,
             "strategy": self.strategy,
             "total_questions_answered": 0,
             "total_questions_correct": 0,
@@ -47,6 +45,7 @@ class LearningTracker:
                 }
             },
             "history": [], 
+            "rating": None,
         }
     
     def get_logs(self):
@@ -88,6 +87,19 @@ class LearningTracker:
             self.logs["total_saq_answered"] += 1
             if is_correct:
                 self.logs["total_saq_correct"] += 1
+
+    def update_rating(self, rating):
+        """Update the rating."""
+        self.logs["rating"] = rating
+
+    def post_logs(self):
+        """Post the logs to the Supabase database."""
+        if not self.supabase:
+            raise ValueError("Supabase client is not initialized.")
+        
+        # Post the logs to the Supabase database
+        response = self.supabase.table("feedback").upsert(self.logs, on_conflict=["session_id"]).execute()
+        return response
         
 
     def get_next_bloom_level(self):
@@ -95,21 +107,15 @@ class LearningTracker:
         if self.current_level is None:
             self.current_level = self._initial_level()
             return self.current_level
-
-        total_questions_valid = self._get_total_questions_valid()
-
-        # Set the threshold for the number of questions to be answered (correctly if until_succes is True) at each level before moving to the next level
-        threshold = self.min_question_per_level + self.loop_count * self.min_question_per_level 
-
-        if total_questions_valid >= threshold:
-            if self.strategy == "default":
-                self._handle_default_strategy()
-            elif self.strategy == "revert":
-                self._handle_revert_strategy()
-            elif self.strategy == "random":
-                self._handle_random_strategy()
-            else:
-                raise ValueError("Invalid strategy.")
+        
+        if self.strategy == "default":
+            self._handle_default_strategy()
+        elif self.strategy == "revert":
+            self._handle_revert_strategy()
+        elif self.strategy == "random":
+            self._handle_random_strategy()
+        else:
+            raise ValueError("Invalid strategy.")
 
         return self.current_level
     
@@ -123,32 +129,70 @@ class LearningTracker:
             return random.randint(1, 6)
         else:
             raise ValueError("Invalid strategy.")
-        
-    def _get_total_questions_valid(self):
-        """Get the total number of questions answered at the current level. Only considers correct answers if until_success is True."""
-        key = "total_questions_correct_per_level" if self.until_success else "total_questions_answered_per_level"
-        return self.logs["bloom"][key][BLOOM_MAP_REVERSE[self.current_level]]
+    
+    def _consecutive_successes(self):
+        """Calculate the number of consecutive successes at the current level."""
+        history = self.logs["history"]
+        successes = 0
+        for entry in reversed(history):
+            if entry["level"] == self.current_level and entry["is_correct"]:
+                successes += 1
+            else:
+                break
+        return successes
+    
+    def _consecutive_failures(self):
+        """Calculate the number of consecutive failures at the current level."""
+        history = self.logs["history"]
+        failures = 0
+        for entry in reversed(history):
+            if entry["level"] == self.current_level and not entry["is_correct"]:
+                failures += 1
+            else:
+                break
+        return failures
 
     def _handle_default_strategy(self):
-        """Set the current level to the next level. If the current level is 6, set it to 1."""
-        if self.current_level < 6:
-            self.current_level += 1
+        """
+        Set the current level based on the default strategy (1 to 6).: 
+        If the consecutive successes at the current level are greater than or equal to the minimum number of successes, move to the next level.
+        If the consecutive failures at the current level are greater than or equal to the maximum number of failures, move to the previous level.
+        """
+        if self._consecutive_successes() >= self.min_success_question:
+            if self.current_level < 6:
+                self.current_level += 1
+        elif self._consecutive_failures() >= self.max_fail_question:
+            if self.current_level > 1:
+                self.current_level -= 1
         else:
-            self.current_level = 1
-            self.loop_count += 1
+            self.current_level = self.current_level
+                    
 
     def _handle_revert_strategy(self):
-        """Set the current level to the previous level. If the current level is 1, set it to 6."""
-        if self.current_level > 1:
-            self.current_level -= 1
+        """
+        Set the current level based on the revert strategy (6 to 1).:
+        If the consecutive failures at the current level are greater than or equal to the maximum number of failures, move to the next level.
+        If the consecutive successes at the current level are greater than or equal to the minimum number of successes, move to the previous level.
+        """
+        if self._consecutive_successes() >= self.min_success_question:
+            if self.current_level > 1:
+                self.current_level -= 1
+        elif self._consecutive_failures() >= self.max_fail_question:
+            if self.current_level < 6:
+                self.current_level += 1
         else:
-            self.current_level = 6
-            self.loop_count += 1
+            self.current_level = self.current_level
+
 
     def _handle_random_strategy(self):
-        """Set the current level to a random level between 1 and 6."""
-        self.current_level = random.randint(1, 6)
-        self.loop_count += 1
+        """
+        Set the current level based on the random strategy (1 to 6).:
+        If the consecutive successes or failures at the current level are greater than or equal to the minimum number of successes or maximum number of failures, move to a random level.
+        """
+        if self._consecutive_successes() >= self.min_success_question or self._consecutive_failures() >= self.max_fail_question:
+            self.current_level = random.randint(1, 6)
+        else:
+            self.current_level = self.current_level
 
     def get_question_type(self):
         """Set the question type."""

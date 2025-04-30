@@ -52,7 +52,11 @@ question_generator = BloomQuestionGenerator()
 async def prepare_upload(file: UploadFile = File(...)):
     session_id = str(uuid.uuid4())
     contents = await file.read()
-    tracker = LearningTracker(session_id, strategy="default", min_question_per_level=1, until_success=False)
+    tracker = LearningTracker(session_id, 
+                              strategy="default", 
+                              min_success_question=1,
+                              max_fail_question=1,
+                              supabase=supabase)
 
     SESSIONS[session_id] = {
         "tracker": tracker,
@@ -185,15 +189,16 @@ def submit_feedback(data: dict = Body(...)):
     try:
         session_id = data.get("session_id")
         rating = data.get("rating")
+        session = SESSIONS.get(session_id)
+        tracker = session["tracker"]
+        tracker.update_rating(rating)
 
         if not session_id or rating is None:
             return {"status": "error", "message": "Missing session_id or rating"}
 
-        supabase.table("feedback").insert({
-            "session_id": session_id,
-            "rating": rating
-        }).execute()
+        response = tracker.post_logs()
 
         return {"status": "success"}
     except Exception as e:
+        print("Error:", e)
         return {"status": "error", "message": str(e)}
