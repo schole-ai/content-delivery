@@ -1,0 +1,16 @@
+services:
+  backend:
+    image: us-docker.pkg.dev/schole-edtech/content-delivery/content-delivery-backend:latest
+    ports:
+      - "8009:8009"
+    env_file:
+      - .env
+    restart: always
+
+  frontend:
+    image: us-docker.pkg.dev/schole-edtech/content-delivery/content-delivery-frontend:latest
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    restart: always

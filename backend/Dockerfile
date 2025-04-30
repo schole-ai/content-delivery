@@ -17,11 +17,11 @@ COPY . /app
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose port 80
-EXPOSE 80
+# Expose port 8009
+EXPOSE 8009
 
 # Define environment variable
 ENV PYTHONUNBUFFERED=1
 
 # Run the application with uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8009"]

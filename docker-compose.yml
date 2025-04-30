@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend
     ports:
-      - "80:80"
+      - "8009:8009"
     env_file:
       - .env
     volumes:
