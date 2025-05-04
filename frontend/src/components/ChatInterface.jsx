@@ -49,8 +49,8 @@ const ChatInterface = ({ sessionId }) => {
       setLoadingMessage('Chunking...')
       setLoading(true)
   
-      // Wait until backend finished processing
-      await fetch(`${BACKEND_URL}/process/${sessionId}`, { method: 'POST' })
+      // // Wait until backend finished processing
+      // await fetch(`${BACKEND_URL}/upload`, { method: 'POST' })
   
       setLoadingMessage('Generating first chunk and question...')
       await fetchNext()
@@ -132,19 +132,29 @@ const ChatInterface = ({ sessionId }) => {
   // If the course is completed, show a completion message
   if (completed === true && !endFeedbackShown) {
     return (
-      <div className="bg-white p-10 rounded-xl shadow-xl text-center space-y-6">
-        <h2 className="text-3xl font-bold text-green-600">🎉 Course Completed!</h2>
-        <p className="text-gray-600">Great job answering all the questions!</p>
-        <EmojiFeedback sessionId={sessionId} onSubmitted={() => setEndFeedbackShown(true)} isFinal={true} />
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="bg-white p-10 rounded-xl shadow-xl text-center space-y-6">
+          <h2 className="text-3xl font-bold text-green-600">🎉 Course Completed!</h2>
+          <p className="text-gray-600">Great job answering all the questions!</p>
+          <EmojiFeedback sessionId={sessionId} onSubmitted={() => setEndFeedbackShown(true)} isFinal={true} />
+        </div>
       </div>
     )
   }
   
   if (completed === true && endFeedbackShown) {
     return (
-      <div className="bg-white p-10 rounded-xl shadow-xl text-center">
-        <h2 className="text-3xl font-bold text-green-600 mb-2">🎉 Course Completed!</h2>
-        <p className="text-gray-600">Thanks for your feedback. See you next time!</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="bg-white p-10 rounded-xl shadow-xl text-center">
+          <h2 className="text-3xl font-bold text-green-600 mb-2">🎉 Course Completed!</h2>
+          <p className="text-gray-600">Thanks for your feedback. See you next time!</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-semibold shadow-md mt-4"
+          >
+            Start New Session
+          </button>
+        </div>
       </div>
     )
   }
