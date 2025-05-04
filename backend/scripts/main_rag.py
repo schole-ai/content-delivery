@@ -12,17 +12,18 @@ from utils.helpers import *
 
 
 def main(args, query):
-    # kgrag = KnowledgeGraphRAG(args.url, args.username, args.password)
-    # results = kgrag.search_query(query)
+    kgrag = KnowledgeGraphRAG(args.url, args.username, args.password)
+    results = kgrag.search_query(query)
+    print("results: ", results)
     # for key, value in results.items():
     #     print(f"{key}: {value['name'], value['content']}")
 
-    retriever = EuclideanRetriever(args.url, args.username, args.password, node_id=1769)
-    idx, top_doc = retriever.retrieve_top_k(query, k=1)
-    retriever = CosineRetriever(args.url, args.username, args.password, node_id=1769)
-    idx, top_doc = retriever.retrieve_top_k(query, k=1)
-    retriever = FaissRetriever(args.url, args.username, args.password, node_id=1769)
-    idx, top_doc = retriever.retrieve_top_k(query, k=1)
+    # retriever = EuclideanRetriever(args.url, args.username, args.password, node_id=1769)
+    # idx, top_doc = retriever.retrieve_top_k(query, k=1)
+    # retriever = CosineRetriever(args.url, args.username, args.password, node_id=1769)
+    # idx, top_doc = retriever.retrieve_top_k(query, k=1)
+    # retriever = FaissRetriever(args.url, args.username, args.password, node_id=1769)
+    # idx, top_doc = retriever.retrieve_top_k(query, k=1)
     # print(f"Top k: {top_doc}")
     # bloom_gen = BloomQuestionGenerator()
     # question = bloom_gen.generate_question(top_doc[0], question_type="MCQ", level=1)

@@ -1,4 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Body
+from fastapi.responses import JSONResponse
+from fastapi import status
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import os
@@ -12,6 +14,8 @@ from io import BytesIO
 from scripts.bloom_gen import BloomQuestionGenerator
 from scripts.chunk import TextChunker, PDFChunker
 from scripts.learner import LearningTracker
+from scripts.neo4j_rag import KnowledgeGraphRAG
+from utils.helpers import connection
 from dotenv import load_dotenv
 from supabase import create_client
 
@@ -46,53 +50,54 @@ app.add_middleware(
 
 SESSIONS = {}  
 
+NEO4J_CREDENTIALS = {}
+
 question_generator = BloomQuestionGenerator()
 
-@app.post("/prepare")
-async def prepare_upload(file: UploadFile = File(...)):
+@app.post("/upload")
+async def upload_and_process(file: UploadFile = File(...)):
     session_id = str(uuid.uuid4())
     contents = await file.read()
-    tracker = LearningTracker(session_id, 
-                              strategy="default", 
-                              min_success_question=1,
-                              max_fail_question=1,
-                              supabase=supabase)
+    filename = file.filename
 
-    SESSIONS[session_id] = {
+    tracker = LearningTracker(
+        session_id,
+        strategy="default",
+        min_success_question=1,
+        max_fail_question=1,
+        supabase=supabase,
+    )
+
+    session_data = {
         "tracker": tracker,
         "file_bytes": contents,
-        "filename": file.filename,
+        "filename": filename,
         "chunks": None,
         "chunks_img": None,
         "questions": [],
         "answers": [],
         "bloom_levels": [],
         "question_types": [],
-        "current_step": 0
+        "current_step": 0,
     }
-
-    return {"session_id": session_id}
-
-@app.post("/process/{session_id}")
-def process_file(session_id: str):
-    session = SESSIONS.get(session_id)
-    contents = session["file_bytes"] 
-    filename = session["filename"]
 
     if filename.endswith(".pdf"):
         file_obj = BytesIO(contents)
         chunker = PDFChunker(file_obj=file_obj)
-        session["chunks"] = chunker.formated_chunks
-        session["chunks_img"] = chunker.chunks_img_b64
+        session_data["chunks"] = chunker.formated_chunks
+        session_data["chunks_img"] = chunker.chunks_img_b64
     elif filename.endswith(".txt"):
         text = contents.decode("utf-8")
         chunker = TextChunker(text)
-        session["chunks"] = chunker.recursive_chunk(chunk_size=1000)
-        session["chunks_img"] = None
+        # session_data["chunks"] = chunker.recursive_chunk(chunk_size=1000)
+        session_data["chunks"] = chunker.statistical_chunk()
+        session_data["chunks_img"] = None
     else:
         raise ValueError("Unsupported file type")
 
-    return {"status": "done"}
+    SESSIONS[session_id] = session_data
+
+    return {"session_id": session_id, "status": "processed"}
 
 @app.get("/chunk/{session_id}")
 def get_chunk(session_id: str):
@@ -105,7 +110,7 @@ def get_chunk(session_id: str):
     question_type = tracker.get_question_type()
     bloom_level = tracker.get_next_bloom_level()
     
-    response = question_generator.generate_question(chunk, question_type, level=bloom_level, prompt_type="desc")
+    response = question_generator.generate_question(chunk, question_type, level=bloom_level, prompt_type="desc", refine=True)
 
     if question_type == "SAQ":
         question = response["question"]
@@ -202,3 +207,90 @@ def submit_feedback(data: dict = Body(...)):
     except Exception as e:
         print("Error:", e)
         return {"status": "error", "message": str(e)}
+    
+
+@app.post("/neo4j/connect")
+def connect_to_neo4j(data: dict = Body(...)):
+    url = data.get("url")
+    username = data.get("username")
+    password = data.get("password")
+
+    if not url or not username or not password:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"status": "error", "message": "Missing Neo4j credentials"}
+        )
+
+    driver = connection(url, username, password)
+    if driver is None:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"status": "error", "message": "Failed to connect to Neo4j. Please check your credentials."}
+        )
+
+    try:
+        with driver.session() as session:
+            session.run("RETURN 1")  # Test query
+
+        driver.close()
+        NEO4J_CREDENTIALS["url"] = url
+        NEO4J_CREDENTIALS["username"] = username
+        NEO4J_CREDENTIALS["password"] = password
+        return {"status": "success", "message": "Connected to Neo4j successfully"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"status": "error", "message": f"An error occurred: {str(e)}"}
+        )
+    
+@app.post("/neo4j/query")
+def query_knowledge_graph(data: dict = Body(...)):
+    query = data.get("query")
+    if not query:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"status": "error", "message": "Query is required"}
+        )
+
+    kg_rag = KnowledgeGraphRAG(
+        url=NEO4J_CREDENTIALS["url"],
+        username=NEO4J_CREDENTIALS["username"],
+        password=NEO4J_CREDENTIALS["password"],
+    )
+
+    content = kg_rag.search_query(query)
+    if not content:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"status": "error", "message": "No content found for this query"}
+        )
+
+    # Simulate uploaded text file flow
+    session_id = str(uuid.uuid4())
+    tracker = LearningTracker(
+        session_id,
+        strategy="default",
+        min_success_question=1,
+        max_fail_question=1,
+        supabase=supabase,
+    )
+
+    chunker = TextChunker(content)
+    chunks = chunker.statistical_chunk()
+
+    session_data = {
+        "tracker": tracker,
+        "file_bytes": None,
+        "filename": "neo4j_content.txt",
+        "chunks": chunks,
+        "chunks_img": None,
+        "questions": [],
+        "answers": [],
+        "bloom_levels": [],
+        "question_types": [],
+        "current_step": 0,
+    }
+
+    SESSIONS[session_id] = session_data
+
+    return {"session_id": session_id, "status": "processed"}

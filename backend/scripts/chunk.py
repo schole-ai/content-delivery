@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 
 from utils.helpers import *
 
-from unstructured.documents.elements import Footer, Header, Image, Table
+from unstructured.documents.elements import *
 from PIL import Image as PILImage, ImageDraw
 
 
@@ -103,7 +103,7 @@ class PDFChunker:
         self.chunks_img = [self.crop_chunk_on_page(chunk) for chunk in self.chunks]
         self.chunks_img_b64 = [self.pil_image_to_base64(chunk) for chunk in self.chunks_img]
 
-    def partition(self, max_characters=6000, combine_text_under_n_chars=1500, new_after_n_chars=4000):
+    def partition(self, max_characters=2000, combine_text_under_n_chars=1000, new_after_n_chars=1500):
         """Partition the PDF into chunks."""
         if self.file_obj:
             chunks = partition_pdf(
@@ -153,6 +153,8 @@ class PDFChunker:
         for element in chunk.metadata.orig_elements:
             # skip footer and header elements
             if isinstance(element, (Header, Footer)): continue
+            # skip uncategorized text elements
+            if element.to_dict().get("type") == "UncategorizedText": continue
             if isinstance(element, Image):
                 b64_code = self.get_image_base64(element)
                 if b64_code:
@@ -190,6 +192,7 @@ class PDFChunker:
 
 
         for el in chunk.metadata.orig_elements:
+            if el.to_dict().get("type") == "UncategorizedText": continue
             if el.metadata.page_number != current_page_number:
                 imgs.append(img)
                 current_page_number = el.metadata.page_number
@@ -205,6 +208,7 @@ class PDFChunker:
             y1 = max(p[1] for p in box)
 
             draw.rectangle([x0, y0, x1, y1], outline="red", width=3)
+            
         
         imgs.append(img)
 
@@ -237,6 +241,7 @@ class PDFChunker:
         x0, y0, x1, y1 = [], [], [], []
 
         for el in chunk.metadata.orig_elements:
+            if el.to_dict().get("type") == "UncategorizedText": continue
             el_page_number = el.metadata.page_number
             if el_page_number != current_page_number:
                 # Crop and store the previous page image
