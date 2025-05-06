@@ -1,12 +1,12 @@
-# Content Delivery
+# Bloom Tutor
 
 ## Overview
 
-Content Delivery is a platform designed to facilitate the generation, evaluation, and delivery of educational content using advanced AI models. It supports functionalities such as question generation, knowledge graph management, and interactive user interfaces for learning.
+Bloom Tutor is a platform designed to facilitate the generation, evaluation, and delivery of educational content using Bloom's Taxonomy, RAG, and advanced LLM models. It supports functionalities such as question generation, knowledge graph management, and interactive user interfaces for learning.
 
 ## Features
 
-- **AI-Powered Question Generation**: Generate questions based on Bloom's Taxonomy.
+- **AI Question Generation**: Generate questions based on Bloom's Taxonomy.
 - **Knowledge Graph Integration**: Manage and query knowledge graphs for enhanced content delivery.
 - **Interactive Frontend**: A React-based interface for seamless user interaction.
 - **Backend Services**: Python-based backend for processing and data management.
