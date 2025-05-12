@@ -5,12 +5,12 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 const FileUploader = ({ onUploadSuccess }) => {
   const [neo4jCredentials, setNeo4jCredentials] = useState({
-    // url: '',
-    // username: '',
-    // password: '',
-    url: 'bolt://localhost:7687',
-    username: 'neo4j',
-    password: 'password123',
+    url: '',
+    username: '',
+    password: '',
+    // url: 'bolt://localhost:7687',
+    // username: 'neo4j',
+    // password: 'password123',
   })
   const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(false)

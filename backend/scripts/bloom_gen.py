@@ -48,7 +48,7 @@ class BloomQuestionGenerator:
             refine (bool): Whether to refine the question if it is not correctly classified by Bloom's Taxonomy.
         
         Returns:
-            str: Generated question.
+            dict: Dictionary containing the generated question and answer options.
         """
 
         assert question_type in ["MCQ", "SAQ"], "Invalid question type. Options are 'MCQ' or 'SAQ."
@@ -105,7 +105,7 @@ class BloomQuestionGenerator:
             question_type (str): Type of question to generate. Options are "MCQ" or "SAQ".
         
         Returns:
-            str: Refined question.
+            dict: Dictionary containing the refined question and answer options.
         """
 
         system_msg, prompt_content = create_refine_prompt(docs, question, question_type, BLOOM_TAXONOMY[gt_level], BLOOM_TAXONOMY[pred_level])
