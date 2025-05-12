@@ -150,8 +150,16 @@ services:
 
 ### 🚀 Step 5 – Run the containers on your VM
 
+-d flag is for background running
+
 ```bash
 docker compose -f docker-compose.prod.yml up -d
+```
+
+Pull images
+
+```bash
+docker compose -f docker-compose.prod.yml up --pull always
 ```
 
 You can now access the application from the **public IP** of your VM:
