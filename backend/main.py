@@ -79,6 +79,7 @@ async def upload_and_process(file: UploadFile = File(...)):
         "bloom_levels": [],
         "question_types": [],
         "current_step": 0,
+        "failed_attempts": {},  # Track failed attempts for each chunk
     }
 
     if filename.endswith(".pdf"):
@@ -121,6 +122,8 @@ def get_chunk(session_id: str):
     session["questions"].append(question)
     session["question_types"].append(question_type)
 
+    is_retry = session["failed_attempts"].get(step, 0) > 0
+
     if session["chunks_img"] is not None:
         chunk = session["chunks_img"][step]
         is_img = True
@@ -128,7 +131,7 @@ def get_chunk(session_id: str):
         chunk = chunk[0].page_content
         is_img = False
 
-    return {"chunk": chunk, 
+    return {"chunk": chunk if not is_retry else None,
             "question": question, 
             "question_type": question_type,
             "bloom_level": BLOOM_MAP_REVERSE[bloom_level],
@@ -137,57 +140,73 @@ def get_chunk(session_id: str):
                 "current": step ,
                 "total": total_chunks,
                 "percent": int(((step) / total_chunks) * 100)
-            }
+            },
+            "is_retry": is_retry
         }
 
 @app.post("/answer/{session_id}")
 def submit_answer(session_id: str, body: AnswerRequest = Body(...)):
     answer = body.answer
     elapsed_time = body.elapsed_time
-
     session = SESSIONS.get(session_id)
-
+    step = session["current_step"]
     total_chunks = len(session["chunks"])
-    question = session["questions"][session["current_step"]]
-    chunk = session["chunks"][session["current_step"]]
-    session["answers"].append(answer)
-    question_type = session["question_types"][session["current_step"]]
 
+    question = session["questions"][-1]
+    chunk = session["chunks"][step]
+    question_type = session["question_types"][-1]
+
+    # Check answer
     if question_type == "MCQ":
         is_correct = question_generator.check_answer_mcq(question, answer)
-        feedback = "" if is_correct else "Correct answer is: " + question["answer"]
-    elif question_type == "SAQ":
+        feedback = "" if is_correct else f"Correct answer is: {question['answer']}"
+    else:
         is_correct, feedback = question_generator.check_answer_saq(chunk, question, answer)
 
+    # Feedback message
     text_emoji = "Correct ✅." if is_correct else "Incorrect ❌."
-
     feedback = f"{text_emoji} {feedback}"
 
-    # Update logs of the tracker
+    # Track attempts
+    session["answers"].append(answer)
     tracker = session["tracker"]
-    bloom_level = session["bloom_levels"][session["current_step"]]
+    bloom_level = session["bloom_levels"][-1]
     tracker.update_logs(question_type, is_correct, bloom_level, elapsed_time, question, answer)
 
-    session["current_step"] += 1
-    step = session["current_step"]
+    # Initialize failed attempts if not yet done
+    if step not in session["failed_attempts"]:
+        session["failed_attempts"][step] = 0
 
-    if step >= len(session["chunks"]):
-        return {"feedback": feedback, 
-                "is_last": True,
-                "progress": {
-                    "current": step,
-                    "total": total_chunks,
-                    "percent": 100
-                } 
-            }
+    # Handle progression logic
+    if is_correct:
+        session["current_step"] += 1
+        session["failed_attempts"].pop(step, None)  # Reset failed attempts
     else:
-        return {"feedback": feedback,
-                "progress": {
-                    "current": step,
-                    "total": total_chunks,
-                    "percent": int(((step) / total_chunks) * 100)
-                }
-            }
+        session["failed_attempts"][step] += 1
+        if session["failed_attempts"][step] >= 2:
+            session["current_step"] += 1
+            session["failed_attempts"].pop(step, None)  # Reset for next chunk
+
+    # Progress response
+    step = session["current_step"]
+    if step >= total_chunks:
+        tracker.post_logs()
+        return {
+            "feedback": feedback,
+            "is_last": True,
+            "progress": {"current": step, "total": total_chunks, "percent": 100},
+        }
+
+    return {
+        "feedback": feedback,
+        "progress": {
+            "current": step,
+            "total": total_chunks,
+            "percent": int((step / total_chunks) * 100),
+        },
+    }
+
+
     
 @app.post("/feedback/{session_id}")
 def submit_feedback(data: dict = Body(...)):
@@ -289,6 +308,47 @@ def query_knowledge_graph(data: dict = Body(...)):
         "bloom_levels": [],
         "question_types": [],
         "current_step": 0,
+    }
+
+    SESSIONS[session_id] = session_data
+
+    return {"session_id": session_id, "status": "processed"}
+
+
+@app.post("/user_study")
+def user_study(body: dict = Body(...)):
+    prolific_id = body.get("prolific_id")
+    if not prolific_id:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"status": "error", "message": "Missing prolific_id"}
+        )
+    session_id = str(uuid.uuid4())
+
+    PRE_CHUNK_PATH = "../user_study/chunks.json"
+    chunker = PDFChunker(load_path=PRE_CHUNK_PATH)
+
+    tracker = LearningTracker(
+        session_id,
+        prolific_id=prolific_id,
+        strategy="default",
+        min_success_question=1,
+        max_fail_question=1,
+        supabase=supabase,
+    )
+
+    session_data = {
+        "tracker": tracker,
+        "file_bytes": None,
+        "filename": "user_study.pdf",
+        "chunks": chunker.formated_chunks,
+        "chunks_img": chunker.chunks_img_b64,
+        "questions": [],
+        "answers": [],
+        "bloom_levels": [],
+        "question_types": [],
+        "current_step": 0,
+        "failed_attempts": {},
     }
 
     SESSIONS[session_id] = session_data

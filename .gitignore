@@ -179,3 +179,5 @@ data
 
 # CSV files
 *.csv
+
+figures

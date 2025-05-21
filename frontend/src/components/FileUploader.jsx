@@ -17,6 +17,11 @@ const FileUploader = ({ onUploadSuccess }) => {
   const [connecting, setConnecting] = useState(false)
   const [neo4jConnected, setNeo4jConnected] = useState(false)
   const [query, setQuery] = useState('')
+  // User Study
+  const [userStudyMode, setUserStudyMode] = useState(false)
+  const [prolificId, setProlificId] = useState('')
+  const [userStudyError, setUserStudyError] = useState('')
+  const [userStudyLoading, setUserStudyLoading] = useState(false)
 
   const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0]
@@ -154,76 +159,146 @@ const FileUploader = ({ onUploadSuccess }) => {
         </div>
       ) : (
         <>
-          {/* File Upload */}
-          <div className="bg-white p-10 rounded-2xl shadow-xl border-3 border-dashed border-orange-300 text-center hover:border-blue-500 transition-all duration-300 w-full max-w-lg" {...getRootProps()}>
-            <input {...getInputProps()} />
-            <h2 className="text-xl font-semibold">Upload your PDF or TXT file</h2>
-            <p className="text-gray-500">
-              {isDragActive
-                ? 'Drop the file here...'
-                : 'Drag and drop a PDF or TXT file, or click to select'}
-            </p>
-          </div>
-
-          {/* OR Separator */}
-          <div className="text-gray-500 font-semibold text-xl">OR</div>
-
-          {/* Neo4j Connection */}
-          <div className="bg-white p-10 rounded-2xl shadow-xl border border-gray-300 w-full max-w-lg">
-            <div className="flex items-center justify-center mb-6">
-              <img
-                src="images/neo4j_icon.png"
-                alt="Neo4j Logo"
-                className="h-12"
-              />
-            </div>
-            <form onSubmit={handleNeo4jSubmit} className="space-y-4">
-              <h2 className="text-xl font-semibold mb-2 text-center">Connect to Neo4j</h2>
-              <input
-                type="text"
-                placeholder="Neo4j URL"
-                value={neo4jCredentials.url}
-                disabled={connecting}
-                onChange={(e) =>
-                  setNeo4jCredentials({ ...neo4jCredentials, url: e.target.value })
-                }
-                className="w-full p-2 border rounded-lg"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Username"
-                value={neo4jCredentials.username}
-                disabled={connecting}
-                onChange={(e) =>
-                  setNeo4jCredentials({ ...neo4jCredentials, username: e.target.value })
-                }
-                className="w-full p-2 border rounded-lg"
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={neo4jCredentials.password}
-                disabled={connecting}
-                onChange={(e) =>
-                  setNeo4jCredentials({ ...neo4jCredentials, password: e.target.value })
-                }
-                className="w-full p-2 border rounded-lg"
-                required
-              />
-              <button
-                type="submit"
-                className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-semibold shadow-md w-full"
-                disabled={connecting}
+          {/* User Study Form Only */}
+          {userStudyMode ? (
+            <div className="bg-white p-10 rounded-2xl shadow-xl border border-gray-300 w-full max-w-lg mt-6">
+              <h2 className="text-xl font-semibold mb-4 text-center">Enter your prolific ID</h2>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  setUserStudyError('')
+                  setUserStudyLoading(true)
+                  try {
+                    // Call backend endpoint to load pre-chunked PDF session
+                    const res = await fetch(`${BACKEND_URL}/user_study`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ prolific_id: prolificId }),
+                    })
+                    const data = await res.json()
+                    if (!res.ok) throw new Error(data.message || 'Failed to start user study')
+                    onUploadSuccess(data.session_id)
+                  } catch (err) {
+                    setUserStudyError(err.message)
+                  } finally {
+                    setUserStudyLoading(false)
+                  }
+                }}
+                className="space-y-4"
               >
-                {connecting ? 'Connecting...' : 'Connect'}
+                <input
+                  type="text"
+                  placeholder="Enter your Prolific ID"
+                  value={prolificId}
+                  onChange={(e) => setProlificId(e.target.value)}
+                  className="w-full p-2 border rounded-lg"
+                  required
+                />
+                <button
+                  type="submit"
+                  className="bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 font-semibold shadow-md w-full"
+                  disabled={userStudyLoading}
+                >
+                  {userStudyLoading ? 'Loading...' : 'Start User Study'}
+                </button>
+                <button
+                  type="button"
+                  className="text-blue-600 hover:underline text-sm"
+                  onClick={() => setUserStudyMode(false)}
+                  disabled={userStudyLoading}
+                >
+                  ← Back
+                </button>
+                {userStudyError && (
+                  <p className="text-red-500 text-sm mt-4">{userStudyError}</p>
+                )}
+              </form>
+            </div>
+          ) : (
+            <>
+              {/* File Upload */}
+              <div className="bg-white p-10 rounded-2xl shadow-xl border-3 border-dashed border-orange-300 text-center hover:border-blue-500 transition-all duration-300 w-full max-w-lg" {...getRootProps()}>
+                <input {...getInputProps()} />
+                <h2 className="text-xl font-semibold">Upload your PDF or TXT file</h2>
+                <p className="text-gray-500">
+                  {isDragActive
+                    ? 'Drop the file here...'
+                    : 'Drag and drop a PDF or TXT file, or click to select'}
+                </p>
+              </div>
+
+              {/* OR Separator */}
+              <div className="text-gray-500 font-semibold text-xl">OR</div>
+
+              {/* Neo4j Connection */}
+              <div className="bg-white p-10 rounded-2xl shadow-xl border border-gray-300 w-full max-w-lg">
+                <div className="flex items-center justify-center mb-6">
+                  <img
+                    src="images/neo4j_icon.png"
+                    alt="Neo4j Logo"
+                    className="h-12"
+                  />
+                </div>
+                <form onSubmit={handleNeo4jSubmit} className="space-y-4">
+                  <h2 className="text-xl font-semibold mb-2 text-center">Connect to Neo4j</h2>
+                  <input
+                    type="text"
+                    placeholder="Neo4j URL"
+                    value={neo4jCredentials.url}
+                    disabled={connecting}
+                    onChange={(e) =>
+                      setNeo4jCredentials({ ...neo4jCredentials, url: e.target.value })
+                    }
+                    className="w-full p-2 border rounded-lg"
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    value={neo4jCredentials.username}
+                    disabled={connecting}
+                    onChange={(e) =>
+                      setNeo4jCredentials({ ...neo4jCredentials, username: e.target.value })
+                    }
+                    className="w-full p-2 border rounded-lg"
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={neo4jCredentials.password}
+                    disabled={connecting}
+                    onChange={(e) =>
+                      setNeo4jCredentials({ ...neo4jCredentials, password: e.target.value })
+                    }
+                    className="w-full p-2 border rounded-lg"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-semibold shadow-md w-full"
+                    disabled={connecting}
+                  >
+                    {connecting ? 'Connecting...' : 'Connect'}
+                  </button>
+                </form>
+                {errorMessage && (
+                  <p className="text-red-500 text-sm mt-4">{errorMessage}</p>
+                )}
+              </div>
+
+              {/* OR Separator */}
+              <div className="text-gray-500 font-semibold text-xl">OR</div>
+
+              {/* User Study Button */}
+              <button
+                className="bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 font-semibold shadow-md w-full max-w-lg"
+                onClick={() => setUserStudyMode(true)}
+              >
+                Complete the User Study
               </button>
-            </form>
-            {errorMessage && (
-              <p className="text-red-500 text-sm mt-4">{errorMessage}</p>
-            )}
-          </div>
+            </>
+          )}
         </>
       )}
     </div>
