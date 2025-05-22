@@ -1,5 +1,5 @@
 
-def create_prompt(docs, question_type, level, prompt_type="basic"):
+def create_prompt(docs, question_type, level, prompt_type="basic", different_from=None):
     """
     Construct the prompt for the LLM to generate a question based on Bloom's Taxonomy.
 
@@ -8,6 +8,7 @@ def create_prompt(docs, question_type, level, prompt_type="basic"):
         question_type (str): Type of question to generate, e.g., multiple-choice (MCQ), short answer (SAQ).
         level (str): Bloom's Taxonomy level for cognitive complexity.
         prompt_type (str): Type of prompt to use, e.g., basic or description.
+        different_from (str): A question that the generated question should be different from.
 
     Returns:
         tuple: System and user prompts
@@ -35,6 +36,12 @@ def create_prompt(docs, question_type, level, prompt_type="basic"):
             "Make sure the question is relevant to the context and is at the correct Bloom's Taxonomy level. "
             "Avoid questions that focus on historical facts, dates, biographies of scientists, or the origins of methods or theories. "
             "The question should be naturally phrased and fully self-contained, without explicitly referencing the context (e.g., avoid phrases like 'according to the text' or 'in the provided text'). "
+        )
+        if different_from is not None:
+            prompt_template += (
+                f"The generated question should address something which is different from the following question: \"{different_from}\". "
+            )
+        prompt_template += (
             f"{output_format_prompt}\n"
             f"Context: {context_text}\n"
         )
@@ -48,6 +55,12 @@ def create_prompt(docs, question_type, level, prompt_type="basic"):
             "Make sure the question is relevant to the context and is at the correct Bloom's Taxonomy level. "
             "Avoid questions that focus on historical facts, dates, biographies of scientists, or the origins of methods or theories. "
             "The question should be naturally phrased and fully self-contained, without explicitly referencing the context (e.g., avoid phrases like 'according to the text' or 'in the provided text'). "
+        )
+        if different_from is not None:
+            prompt_template += (
+                f"The generated question should address something which is different from the following question: \"{different_from}\". "
+            )
+        prompt_template += (
             f"{output_format_prompt}\n"
             f"Context: {context_text}\n"
         )
@@ -63,6 +76,12 @@ def create_prompt(docs, question_type, level, prompt_type="basic"):
             "Make sure the question is relevant to the context and is at the correct Bloom's Taxonomy level. "
             "Avoid questions that focus on historical facts, dates, biographies of scientists, or the origins of methods or theories. "
             "The question should be naturally phrased and fully self-contained, without explicitly referencing the context (e.g., avoid phrases like 'according to the text' or 'in the provided text'). "
+        )
+        if different_from is not None:
+            prompt_template += (
+                f"The generated question should address something which is different from the following question: \"{different_from}\". "
+            )
+        prompt_template += (
             f"{output_format_prompt}\n"
             f"Context: {context_text}\n"
         )

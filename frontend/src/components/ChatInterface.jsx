@@ -30,9 +30,16 @@ const ChatInterface = ({ sessionId }) => {
   const fetchNext = async () => {
     const res = await fetch(`${BACKEND_URL}/chunk/${sessionId}`);
     const data = await res.json()
-    setChunk(data.chunk)
+    
+    if (!data.is_retry) {
+      setChunk(data.chunk);
+      setIsImage(data.is_img);
+    } else {
+      setChunk('');
+      setIsImage(false);
+    }
+
     setQuestion(data.question)
-    setIsImage(data.is_img)
     setProgress(data.progress)
     setQuestion(data.question)
     setQuestionType(data.question_type)
@@ -105,30 +112,36 @@ const ChatInterface = ({ sessionId }) => {
     setMessages((prev) => [
       ...prev,
       { chunk, question, lastAnswer, answer, feedback, isImage, bloomLevel },
-    ])
-  
-    setLoadingMessage('Loading next chunk...')
-    setLoading(true)
-  
-    const res = await fetch(`${BACKEND_URL}/chunk/${sessionId}`)
-    const data = await res.json()
-  
-    setChunk(data.chunk)
-    setQuestion(data.question)
-    setQuestion(data.question)
-    setQuestionType(data.question_type)
-    setBloomLevel(data.bloom_level)
-    setProgress(data.progress)
-    setFeedback('')
-    setQuestionStartTime(Date.now())
-    setShowFeedback(false)
-    setLoading(false)
+    ]);
+
+    setLoadingMessage('Loading next chunk...');
+    setLoading(true);
+
+    const res = await fetch(`${BACKEND_URL}/chunk/${sessionId}`);
+    const data = await res.json();
+
+    if (!data.is_retry) {
+      setChunk(data.chunk);
+      setIsImage(data.is_img);
+    } else {
+      setChunk('');
+      setIsImage(false);
+    }
+
+    setQuestion(data.question);
+    setQuestionType(data.question_type);
+    setBloomLevel(data.bloom_level);
+    setProgress(data.progress);
+    setFeedback('');
+    setQuestionStartTime(Date.now());
+    setShowFeedback(false);
+    setLoading(false);
     setTimeout(() => {
       currentChunkRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);    
-  }
-  
+    }, 100);
+  };
 
+  
   // If the course is completed, show a completion message
   if (completed === true && !endFeedbackShown) {
     return (

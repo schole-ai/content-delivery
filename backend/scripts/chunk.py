@@ -1,5 +1,7 @@
 import os
 import io
+import json
+import base64
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
@@ -95,13 +97,17 @@ class TextChunker:
 
 class PDFChunker:
     """A class which extracts content from PDFs and chunks it."""
-    def __init__(self, pdf_path=None, file_obj=None):
+    def __init__(self, pdf_path=None, file_obj=None, load_path=None):
         self.pdf_path = pdf_path
         self.file_obj = file_obj
-        self.chunks = self.partition()
-        self.formated_chunks = [self.format_chunk(chunk) for chunk in self.chunks]
-        self.chunks_img = [self.crop_chunk_on_page(chunk) for chunk in self.chunks]
-        self.chunks_img_b64 = [self.pil_image_to_base64(chunk) for chunk in self.chunks_img]
+        self.load_path = load_path
+        if self.load_path:
+            self.formated_chunks, self.chunks_img_b64 = self.load_chunks(self.load_path)
+        else:
+            self.chunks = self.partition()
+            self.formated_chunks = [self.format_chunk(chunk) for chunk in self.chunks]
+            self.chunks_img = [self.crop_chunk_on_page(chunk) for chunk in self.chunks]
+            self.chunks_img_b64 = [self.pil_image_to_base64(chunk) for chunk in self.chunks_img]
 
     def partition(self, max_characters=2000, combine_text_under_n_chars=1000, new_after_n_chars=1500):
         """Partition the PDF into chunks."""
@@ -299,4 +305,43 @@ class PDFChunker:
             y_offset += img.height + padding
 
         return combined
+
+    def save_chunks(self, path):
+        """
+        Save formatted chunks and chunk images (as base64) to a JSON file.
+        """
+        data = []
+        for chunk, img_b64 in zip(self.formated_chunks, self.chunks_img_b64):
+            chunk_data = []
+            for doc in chunk:
+                chunk_data.append({
+                    "page_content": doc.page_content,
+                    "metadata": doc.metadata
+                })
+            data.append({
+                "formated_chunk": chunk_data,
+                "chunk_img_b64": img_b64
+            })
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def load_chunks(self, path):
+        """
+        Load formatted chunks and chunk images (as base64) from a JSON file.
+        Returns: (formated_chunks, chunks_img, chunks_img_b64)
+        """
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        formated_chunks = []
+        chunks_img_b64 = []
+        chunks_img = []
+        for entry in data:
+            chunk_docs = []
+            for doc in entry["formated_chunk"]:
+                chunk_docs.append(Document(page_content=doc["page_content"], metadata=doc["metadata"]))
+            formated_chunks.append(chunk_docs)
+            img_b64 = entry["chunk_img_b64"]
+            chunks_img_b64.append(img_b64)
+
+        return formated_chunks, chunks_img_b64
 

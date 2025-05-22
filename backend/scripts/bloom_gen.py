@@ -36,7 +36,7 @@ class BloomQuestionGenerator:
         )
     
 
-    def generate_question(self, docs, question_type="MCQ", level=1, prompt_type="basic", refine=False):
+    def generate_question(self, docs, question_type="MCQ", level=1, prompt_type="basic", different_from=None, refine=False):
         """
         Generate a question from a chunk based on Bloom's Taxonomy.
 
@@ -45,6 +45,7 @@ class BloomQuestionGenerator:
             question_type (str): Type of question to generate. Options are "MCQ" or "SAQ".
             level (int): Bloom's Taxonomy level to generate questions from.
             prompt_type (str): Type of prompt to use. Options are "basic" or "description".
+            different_from (str): Question to generate a different question from.
             refine (bool): Whether to refine the question if it is not correctly classified by Bloom's Taxonomy.
         
         Returns:
@@ -54,7 +55,7 @@ class BloomQuestionGenerator:
         assert question_type in ["MCQ", "SAQ"], "Invalid question type. Options are 'MCQ' or 'SAQ."
         assert level in range(1, 7), "Invalid Bloom's Taxonomy level. Level should be between 1 and 6."
 
-        system_msg, prompt_content = create_prompt(docs, question_type, BLOOM_TAXONOMY[level], prompt_type)
+        system_msg, prompt_content = create_prompt(docs, question_type, BLOOM_TAXONOMY[level], prompt_type, different_from)
        
         chat_template = ChatPromptTemplate.from_messages(
             [
