@@ -110,8 +110,20 @@ def get_chunk(session_id: str):
     tracker = session["tracker"]
     question_type = tracker.get_question_type()
     bloom_level = tracker.get_next_bloom_level()
+
+    is_retry = session["failed_attempts"].get(step, 0) > 0
+
+    if is_retry:
+        last_question = session["questions"][-1]
+    else:
+        last_question = None
     
-    response = question_generator.generate_question(chunk, question_type, level=bloom_level, prompt_type="desc", refine=True)
+    response = question_generator.generate_question(chunk, 
+                                                    question_type, 
+                                                    level=bloom_level, 
+                                                    prompt_type="desc", 
+                                                    different_from=last_question,
+                                                    refine=True)
 
     if question_type == "SAQ":
         question = response["question"]
@@ -120,9 +132,7 @@ def get_chunk(session_id: str):
 
     session["bloom_levels"].append(bloom_level)
     session["questions"].append(question)
-    session["question_types"].append(question_type)
-
-    is_retry = session["failed_attempts"].get(step, 0) > 0
+    session["question_types"].append(question_type)  
 
     if session["chunks_img"] is not None:
         chunk = session["chunks_img"][step]
