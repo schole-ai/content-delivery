@@ -6,10 +6,19 @@ BLOOM_MAP_REVERSE = {v: k for k, v in BLOOM_MAP.items()}
 
 class LearningTracker:
     """Class to track the learning progress of a user."""
-    def __init__(self, session_id, prolific_id=None, strategy="default", min_success_question=2, max_fail_question=2, supabase=None):
+    def __init__(self, 
+                 session_id, 
+                 prolific_id=None, 
+                 strategy="default", 
+                 min_success_question=2, 
+                 max_fail_question=2, 
+                 init_bloom_level=None, 
+                 supabase=None):
+        
         self.session_id = session_id
         self.prolific_id = prolific_id
         self.strategy = strategy    # strategy to change the level, can be "default", "revert" or "random"
+        self.init_bloom_level = init_bloom_level
         self.min_success_question = min_success_question # minimum number of questions to be answered correctly at each level before moving to the next level
         self.max_fail_question = max_fail_question # maximum number of questions to be answered incorrectly at each level before moving back to the previous level
         self.current_level = None
@@ -123,6 +132,9 @@ class LearningTracker:
     
     def _initial_level(self):
         """Set the initial level for the different strategies."""	
+        if self.init_bloom_level is not None:
+            return self.init_bloom_level
+        
         if self.strategy == "default":
             return 1
         elif self.strategy == "revert":

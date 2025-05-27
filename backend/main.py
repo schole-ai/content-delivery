@@ -72,6 +72,7 @@ async def upload_and_process(file: UploadFile = File(...)):
         "tracker": tracker,
         "file_bytes": contents,
         "filename": filename,
+        "topic": None, 
         "chunks": None,
         "chunks_img": None,
         "questions": [],
@@ -118,10 +119,12 @@ def get_chunk(session_id: str):
     else:
         last_question = None
     
+    print(session["topic"])
     response = question_generator.generate_question(chunk, 
                                                     question_type, 
                                                     level=bloom_level, 
                                                     prompt_type="desc", 
+                                                    topic=session["topic"],
                                                     different_from=last_question,
                                                     refine=True)
 
@@ -311,6 +314,7 @@ def query_knowledge_graph(data: dict = Body(...)):
         "tracker": tracker,
         "file_bytes": None,
         "filename": "neo4j_content.txt",
+        "topic": None,
         "chunks": chunks,
         "chunks_img": None,
         "questions": [],
@@ -344,6 +348,7 @@ def user_study(body: dict = Body(...)):
         strategy="default",
         min_success_question=1,
         max_fail_question=1,
+        init_bloom_level=3,
         supabase=supabase,
     )
 
@@ -351,6 +356,7 @@ def user_study(body: dict = Body(...)):
         "tracker": tracker,
         "file_bytes": None,
         "filename": "user_study.pdf",
+        "topic": "AI Agent",
         "chunks": chunker.formated_chunks,
         "chunks_img": chunker.chunks_img_b64,
         "questions": [],
