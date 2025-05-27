@@ -109,7 +109,7 @@ class PDFChunker:
             self.chunks_img = [self.crop_chunk_on_page(chunk) for chunk in self.chunks]
             self.chunks_img_b64 = [self.pil_image_to_base64(chunk) for chunk in self.chunks_img]
 
-    def partition(self, max_characters=2000, combine_text_under_n_chars=1000, new_after_n_chars=1500):
+    def partition(self, max_characters=1500, combine_text_under_n_chars=500, new_after_n_chars=1000):
         """Partition the PDF into chunks."""
         if self.file_obj:
             chunks = partition_pdf(
