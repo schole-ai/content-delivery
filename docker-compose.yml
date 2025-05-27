@@ -8,6 +8,7 @@ services:
       - .env
     volumes:
       - ./backend:/app
+      - ./user_study:/user_study
     # depends_on:
     #   - db
     restart: always
@@ -38,6 +39,5 @@ services:
   #     interval: 10s
   #     timeout: 5s
   #     retries: 5
-
 # volumes:
 #   db_data:
