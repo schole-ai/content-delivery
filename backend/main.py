@@ -339,7 +339,7 @@ def user_study(body: dict = Body(...)):
         )
     session_id = str(uuid.uuid4())
 
-    PRE_CHUNK_PATH = "../user_study/chunks.json"
+    PRE_CHUNK_PATH = "./user_study/chunks.json"
     chunker = PDFChunker(load_path=PRE_CHUNK_PATH)
 
     tracker = LearningTracker(

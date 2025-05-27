@@ -112,6 +112,7 @@ sudo apt update
 sudo apt install docker.io -y
 sudo usermod -aG docker $USER
 newgrp docker
+sudo apt install docker-compose-v2
 
 # Authenticate Docker inside the VM
 gcloud auth configure-docker us-docker.pkg.dev
