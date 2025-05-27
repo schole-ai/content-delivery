@@ -8,7 +8,6 @@ services:
       - .env
     volumes:
       - ./backend:/app
-      - ./user_study:/user_study
     # depends_on:
     #   - db
     restart: always
