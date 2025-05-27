@@ -216,6 +216,17 @@ const FileUploader = ({ onUploadSuccess }) => {
             </div>
           ) : (
             <>
+              {/* User Study Button */}
+              <button
+                className="bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 font-semibold shadow-md w-full max-w-lg"
+                onClick={() => setUserStudyMode(true)}
+              >
+                Complete the User Study
+              </button>
+
+              {/* OR Separator */}
+              <div className="text-gray-500 font-semibold text-xl">OR</div>
+
               {/* File Upload */}
               <div className="bg-white p-10 rounded-2xl shadow-xl border-3 border-dashed border-orange-300 text-center hover:border-blue-500 transition-all duration-300 w-full max-w-lg" {...getRootProps()}>
                 <input {...getInputProps()} />
@@ -286,17 +297,6 @@ const FileUploader = ({ onUploadSuccess }) => {
                   <p className="text-red-500 text-sm mt-4">{errorMessage}</p>
                 )}
               </div>
-
-              {/* OR Separator */}
-              <div className="text-gray-500 font-semibold text-xl">OR</div>
-
-              {/* User Study Button */}
-              <button
-                className="bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 font-semibold shadow-md w-full max-w-lg"
-                onClick={() => setUserStudyMode(true)}
-              >
-                Complete the User Study
-              </button>
             </>
           )}
         </>
